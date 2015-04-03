@@ -25,6 +25,13 @@ with open('README.rst') as f:
 
 install_requires = ['lxml', 'python-dateutil']
 
+# Python 2.6 doesn't have WeakSet :(
+try:
+    from weakref import WeakSet
+except ImportError:
+    install_requires.append('weakrefset')
+
+
 extras_require = {
     'docs': [
         'Sphinx==1.2.1',
