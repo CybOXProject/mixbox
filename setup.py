@@ -17,7 +17,7 @@ def get_version():
 with open('README.rst') as f:
     readme = f.read()
 
-install_requires = ['six>=1.9.0', 'python-dateutil']
+install_requires = ['six>=1.9.0', 'python-dateutil', 'weakrefset']
 
 extras_require = {
     'docs': [
