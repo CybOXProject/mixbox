@@ -22,10 +22,10 @@ class Cached(object):
         super(Foo, self).__init__() to put itself in the cache.
 
     """
-    _instance_cache = collections.defaultdict(WeakSet)
+    _object_cache = collections.defaultdict(WeakSet)
 
     def __init__(self):
-        object_cache = Cached._instance_cache[self.__class__]
+        object_cache = Cached._object_cache[self.__class__]
         object_cache.add(self)
 
 
@@ -44,7 +44,7 @@ class IDCached(Cached):
         """
         # WeakSets can change during iteration if the garbage collector runs.
         # Make a local tuple to iterate over.
-        object_cache = tuple(Cached._instance_cache[cls])
+        object_cache = tuple(Cached._object_cache[cls])
 
         for cached in object_cache:
             if cached.id_ == id:
@@ -94,7 +94,7 @@ class IDTimestampCached(Cached):
         """
         # WeakSets can change during iteration if the garbage collector runs.
         # Make a local tuple to iterate over.
-        object_cache = tuple(Cached._instance_cache[cls])
+        object_cache = tuple(Cached._object_cache[cls])
 
         for cached in object_cache:
             if cls._matches(id, timestamp, cached):
@@ -110,5 +110,5 @@ class IDTimestampCached(Cached):
             id: The id of the cached item(s).
 
         """
-        object_cache = tuple(Cached._instance_cache[cls])
+        object_cache = tuple(Cached._object_cache[cls])
         return tuple(x for x in object_cache if x.id_ == id)
