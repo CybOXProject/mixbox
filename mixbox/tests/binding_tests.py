@@ -6,8 +6,8 @@
 
 import unittest
 
-import six
-from six import u
+from mixbox.vendor import six
+from mixbox.vendor.six import u
 
 from mixbox.binding_utils import quote_attrib, quote_xml
 

@@ -8,7 +8,8 @@ import re
 from xml.sax import saxutils
 
 from lxml import etree as etree_
-import six
+
+from .vendor import six
 
 CDATA_START = "<![CDATA["
 CDATA_END = "]]>"

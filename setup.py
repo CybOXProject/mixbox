@@ -23,7 +23,7 @@ def get_version():
 with open('README.rst') as f:
     readme = f.read()
 
-install_requires = ['lxml', 'six>=1.9.0', 'python-dateutil']
+install_requires = ['lxml', 'python-dateutil']
 
 extras_require = {
     'docs': [
