@@ -8,7 +8,8 @@ import re
 from xml.sax import saxutils
 
 from lxml import etree as etree_
-import six
+
+from .vendor import six
 
 CDATA_START = "<![CDATA["
 CDATA_END = "]]>"
@@ -55,6 +56,8 @@ class _FixedOffsetTZ(tzinfo):
 
     def dst(self, dt):
         return None
+
+    __reduce__ = object.__reduce__
 
 
 class GeneratedsSuper(object):
