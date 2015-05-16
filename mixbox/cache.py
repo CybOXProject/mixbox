@@ -74,13 +74,19 @@ class Cached(object):
         object cache if the attr being set is equal to _cached_id_key.
 
         """
+        # Get the previous value if it was set.
         prev = getattr(self, key, None)
-
-        if key == self._cached_id_key:
-            self._update_cache(prev, value)
 
         # Pass the call along
         super(Cached, self).__setattr__(key, value)
+
+        # If the attribute being set is our cache id key, update the cache
+        if key == self._cached_id_key:
+            # Should I call `getattr(self, key)` here too in case the value was
+            # mutated during super().__setattr__()?
+            self._update_cache(prev, value)
+
+
 
 
 def _matches(obj, criteria):
