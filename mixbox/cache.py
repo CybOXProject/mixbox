@@ -4,11 +4,35 @@
 # builtin
 import collections
 
+# external
+from mixbox.vendor import six
+
 # Python 2.6 doesn't have WeakSet :(
 try:
     from weakref import WeakSet
 except ImportError:
     from weakrefset import WeakSet
+
+
+_CACHE_MISS_FMT = "No cached %s for id '%s' and filter kwargs: %s"
+_MULTIPLE_CACHED_FMT = ("Multiple cached %s for id '%s' and filter kwargs: "
+                        "%s")
+
+
+class MultipleCached(Exception):
+    """Raised when multiple items are found in the cache for a
+    given set of lookup parameters.
+
+    """
+    pass
+
+
+class CacheMiss(Exception):
+    """Raised when no items belong in the cache that match the criteria.
+
+    """
+    pass
+
 
 
 class Cached(object):
@@ -23,92 +47,58 @@ class Cached(object):
 
     """
     _object_cache = collections.defaultdict(WeakSet)
+    _id_key = "id_"
 
     def __init__(self):
-        object_cache = Cached._object_cache[self.__class__]
-        object_cache.add(self)
-
-
-class IDCached(Cached):
-    """Mixin class which enables object caching and id-based lookups.
-
-    """
-    def __init__(self):
-        super(IDCached, self).__init__()
+        super(Cached, self).__init__()
+        cache = Cached._object_cache[self.__class__]
+        cache.add(self)
 
     @classmethod
-    def cache_get(cls, id):
-        """Returns an object of type `cls` which has an ``id_`` property
-        equal to `id`
+    def _get_cached_instances(cls):
+        object_cache = Cached._object_cache
 
-        """
+        # Find all subclasses of cls that are in the object cache
+        subclasses = (x for x in object_cache if issubclass(x, cls))
+
         # WeakSets can change during iteration if the garbage collector runs.
-        # Make a local tuple to iterate over.
-        object_cache = tuple(Cached._object_cache[cls])
+        # Coerce them into strong references by inserting objects into a list
+        cached = []
+        for subclass in subclasses:
+            cache = tuple(object_cache.get(subclass, ()))
+            cached.extend(cache)
 
-        for cached in object_cache:
-            if cached.id_ == id:
-                return cached
-
-        return None
-
-
-class IDTimestampCached(Cached):
-    """Mixin class which enables object caching and lookups via id and
-    timestamp pairs.
-
-    """
-    def __init__(self):
-        super(IDTimestampCached, self).__init__()
-
-    @staticmethod
-    def _matches(id, ts, item):
-        """Returns ``True`` if the input `item` has an ``id_`` and
-        ``timestamp`` which matches the input `id` and `ts` values.
-
-        Note:
-            Timestamps which contain UTC offset or tz information cannot
-            be compared to timestamps that do not contain that information.
-            Attempting to do so will raise a TypeError. If this occurs, we
-            return ``False``.
-
-        Args:
-            id: An id to match against
-            ts: A timestamp to match against
-            item: An object with an ``id_`` and ``timestamp`` property.
-
-        """
-        try:
-            return (item.id_ == id) and (item.timestamp == ts)
-        except TypeError:
-            return False
+        return cached
 
     @classmethod
-    def cache_get(cls, id, timestamp=None):
-        """Return a cached object with matching id and timestamp information.
+    def filter(cls, id, **kwargs):
+        # Get all cached instances of `cls`
+        cached = cls._get_cached_instances()
 
-        Args:
-            id: The id of the cached item.
-            timestamp: The timestamp of the cached item. Default is ``None``.
+        # Make sure that id is one of the filter criteria
+        kwargs[cls._id_key] = id
 
-        """
-        # WeakSets can change during iteration if the garbage collector runs.
-        # Make a local tuple to iterate over.
-        object_cache = tuple(Cached._object_cache[cls])
+        # Shortening line length
+        kwargs = six.iteritems(kwargs)
 
-        for cached in object_cache:
-            if cls._matches(id, timestamp, cached):
-                return cached
+        # Find all cached objects which have attr values that align with
+        # the input kwargs.
+        match = (x for x in cached if all(getattr(x, k) == v for k, v in kwargs))
 
-        return None
+        return tuple(match)
 
     @classmethod
-    def cache_get_all(cls, id):
-        """Returns a tuple of cached objects that have matching id information.
+    def get(cls, id, **kwargs):
+        cached = cls.filter(id, **kwargs)
 
-        Args:
-            id: The id of the cached item(s).
+        if len(cached) == 1:
+            return cached[0]
 
-        """
-        object_cache = tuple(Cached._object_cache[cls])
-        return tuple(x for x in object_cache if x.id_ == id)
+        if not cached:
+            error = _CACHE_MISS_FMT % (cls.__name__, id, kwargs)
+            raise CacheMiss(error)
+
+        error = _MULTIPLE_CACHED_FMT % (cls.__name__, id, kwargs)
+        raise MultipleCached(error)
+
+
