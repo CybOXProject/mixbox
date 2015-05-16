@@ -73,12 +73,16 @@ class Cached(object):
         _CACHE[new_id].add(self)
 
     def __setattr__(self, key, value):
+        """Intercepts the object.__setattr__() and updates the mixbox
+        object cache if the attr being set is equal to _cached_id_key.
+
+        """
         prev = getattr(self, key, None)
 
         if key == self._cached_id_key:
             self._update_cache(prev, value)
 
-        # Pass it along
+        # Pass the call along
         super(Cached, self).__setattr__(key, value)
 
 
@@ -140,7 +144,7 @@ def getall(id, **kwargs):
 
 
 def get(id, **kwargs):
-    """Returns a single object that matches the input paramters.
+    """Returns a single object that matches the input parameters.
 
     Args:
         id: An object id to look up.
