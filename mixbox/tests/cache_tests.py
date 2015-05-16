@@ -12,15 +12,22 @@ import dateutil.parser
 from mixbox import dates
 from mixbox.cache import Cached, CacheMiss, MultipleCached
 
-
 NOW = dates.now()
-
 
 class Foo(Cached):
     def __init__(self):
         super(Foo, self).__init__()
         self.id_ = None
         self.timestamp = None
+
+    @property
+    def id_(self):
+        return self._id
+
+    @id_.setter
+    def id_(self, value):
+        self._id = value
+
 
 class TestCached(unittest.TestCase):
 

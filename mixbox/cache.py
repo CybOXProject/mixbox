@@ -14,9 +14,12 @@ except ImportError:
     from weakrefset import WeakSet
 
 
-_CACHE_MISS_FMT = "No cached %s for id '%s' and filter kwargs: %s"
-_MULTIPLE_CACHED_FMT = ("Multiple cached %s for id '%s' and filter kwargs: "
-                        "%s")
+# Internal object cache.
+_CACHE = collections.defaultdict(WeakSet)
+
+# Error messages
+_CACHE_MISS_FMT = "No cached objects for id: '%s' and kwargs: %s"
+_MULTIPLE_CACHED_FMT = "Multiple cached items for id: '%s' and kwargs: %s"
 
 
 class MultipleCached(Exception):
@@ -34,71 +37,131 @@ class CacheMiss(Exception):
     pass
 
 
-
 class Cached(object):
-    """Base mixin for managing object caches.
-
-    This defines a class-level dictionary which maps class types to a set
-    of object weakrefs.
-
-    Note:
-        Classes which utilize :class:`Cached` mixins will need to call
-        super(Foo, self).__init__() to put itself in the cache.
+    """Mixin for managing object caches.
 
     """
-    _object_cache = collections.defaultdict(WeakSet)
-    _id_key = "id_"
-
-    def __init__(self):
-        super(Cached, self).__init__()
-        cache = Cached._object_cache[self.__class__]
-        cache.add(self)
-
-    @classmethod
-    def _get_cached_instances(cls):
-        object_cache = Cached._object_cache
-
-        # Find all subclasses of cls that are in the object cache
-        subclasses = (x for x in object_cache if issubclass(x, cls))
-
-        # WeakSets can change during iteration if the garbage collector runs.
-        # Coerce them into strong references by inserting objects into a list
-        cached = []
-        for subclass in subclasses:
-            cache = tuple(object_cache.get(subclass, ()))
-            cached.extend(cache)
-
-        return cached
-
-    @classmethod
-    def filter(cls, id, **kwargs):
-        # Get all cached instances of `cls`
-        cached = cls._get_cached_instances()
-
-        # Make sure that id is one of the filter criteria
-        kwargs[cls._id_key] = id
-
-        # Shortening line length
-        kwargs = six.iteritems(kwargs)
-
-        # Find all cached objects which have attr values that align with
-        # the input kwargs.
-        match = (x for x in cached if all(getattr(x, k) == v for k, v in kwargs))
-
-        return tuple(match)
+    _cached_id_key = "id_"
 
     @classmethod
     def get(cls, id, **kwargs):
-        cached = cls.filter(id, **kwargs)
+        """Proxy method to :meth:`mixbox.cache.get`.
 
-        if len(cached) == 1:
-            return cached[0]
+        """
+        return get(id, **kwargs)
 
-        if not cached:
-            error = _CACHE_MISS_FMT % (cls.__name__, id, kwargs)
-            raise CacheMiss(error)
+    @classmethod
+    def filter(cls, id, **kwargs):
+        """Proxy method to :meth:`mixbox.cache.getall`.
 
-        error = _MULTIPLE_CACHED_FMT % (cls.__name__, id, kwargs)
-        raise MultipleCached(error)
+        """
+        return getall(id, **kwargs)
+
+    def _update_cache(self, old_id, new_id):
+        """Updates the mixbox object cache. This will remove `self` from the
+        its old ID group in the cache and insert it into the new ID group.
+
+        Args:
+            old_id: An old
+
+        """
+        # Remove self to the old ID group
+        cached = _CACHE.get(old_id, set())
+        cached.discard(self)
+
+        # Add it to the correct ID group
+        _CACHE[new_id].add(self)
+
+    def __setattr__(self, key, value):
+        prev = getattr(self, key, None)
+
+        if key == self._cached_id_key:
+            self._update_cache(prev, value)
+
+        # Pass it along
+        super(Cached, self).__setattr__(key, value)
 
 
+def _matches(obj, criteria):
+    """Returns ``True`` if object contains attribute values that match the
+    input `criteria`.
+
+    Args:
+        obj: A Python object.
+        criteria: A tuple of attribute name/value pairs to compare object to.
+
+    Raises:
+        AttributeError if `obj` does not contain an attribute that is used
+        in criteria.
+
+    """
+    try:
+        return all(getattr(obj, k) == v for k, v in criteria)
+    except (TypeError, ValueError):
+        return False
+
+
+def getall(id, **kwargs):
+    """Returns a tuple of cached objects that have property values that match
+    the input filter parameters.
+
+    Example:
+        >>> getall('example:Package-1')
+        (obj1, obj2, obj3)
+        >>> getall('example:Package-1', timestamp=some_timestamp)
+        (obj1)
+        >>> getall('example:Bad-ID')
+        ()
+
+    Args:
+        id: An object identifier. Usually is usually an ``id_`` value.
+        **kwargs: Other attribute name/value pairs to look for.
+
+    """
+    if id not in _CACHE:
+        return []
+
+    # Need to convert the WeakSet to a tuple because the garbarge
+    # collector could possibly modifiy the cache while we're iterating over
+    # it.
+    cached = tuple(_CACHE[id])
+
+    if not kwargs:
+        return cached
+
+    # Shortening line length
+    criteria = kwargs.items()
+
+    # Find all cached objects which have attr values that align with
+    # the input kwargs.
+    filtered = tuple(x for x in cached if _matches(x, criteria))
+
+    return filtered
+
+
+def get(id, **kwargs):
+    """Returns a single object that matches the input paramters.
+
+    Args:
+        id: An object id to look up.
+        **kwargs: Other object-specific properties to use as filter criteria.
+
+    Returns:
+        A single Python object that matches the input criteria.
+
+    Raises:
+        CacheMiss: If no object exists for the given criteria.
+        MultipleCached: If more than one object exists for the given critera.
+
+    """
+    cached = getall(id, **kwargs)
+
+    if len(cached) == 1:
+        return cached[0]
+
+    if not cached:
+        error = _CACHE_MISS_FMT % (id, kwargs)
+        raise CacheMiss(error)
+
+    error = _MULTIPLE_CACHED_FMT % (id, kwargs)
+    raise MultipleCached(error)
