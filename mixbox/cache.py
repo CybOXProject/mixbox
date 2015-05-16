@@ -4,9 +4,6 @@
 # builtin
 import collections
 
-# external
-from mixbox.vendor import six
-
 # Python 2.6 doesn't have WeakSet :(
 try:
     from weakref import WeakSet
@@ -123,7 +120,7 @@ def getall(id, **kwargs):
 
     """
     if id not in _CACHE:
-        return []
+        return ()
 
     # Need to convert the WeakSet to a tuple because the garbarge
     # collector could possibly modifiy the cache while we're iterating over
