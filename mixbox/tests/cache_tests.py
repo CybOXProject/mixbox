@@ -5,6 +5,9 @@
 import gc
 import unittest
 
+# external
+from mixbox.vendor import six
+
 # internal
 from mixbox import dates, cache
 from mixbox.cache import Cached, CacheMiss, MultipleCached
@@ -94,7 +97,7 @@ class TestCached(unittest.TestCase):
         )
 
     def test_count(self):
-        l = [Foo(id_=x) for _ in xrange(10) for x in xrange(10)]
+        l = [Foo(id_=x) for _ in six.moves.range(10) for x in six.moves.range(10)]
         self.assertEqual(cache.count(), len(l))
 
         # Now remove all strong references to Foo objects and recheck the count
