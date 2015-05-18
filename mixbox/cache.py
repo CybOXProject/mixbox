@@ -18,8 +18,8 @@ except ImportError:
 _CACHE = collections.defaultdict(WeakSet)
 
 # Error messages
-_CACHE_MISS_FMT = "No cached objects for id: '%s' and kwargs: %s"
-_MULTIPLE_CACHED_FMT = "Multiple cached items for id: '%s' and kwargs: %s"
+_CACHE_MISS_FMT = "No cached objects for key: '%s' and kwargs: %s"
+_MULTIPLE_CACHED_FMT = "Multiple cached items for key: '%s' and kwargs: %s"
 
 
 class MultipleCached(Exception):
@@ -45,18 +45,39 @@ class Cached(object):
 
     @classmethod
     def get(cls, id, **kwargs):
-        """Proxy method to :meth:`mixbox.cache.get`.
+        """Returns a single object from the mixbox cache that is an
+        instance of `cls` and matches the input criteria.
+
+        Args:
+            id: An object identifier.
+            **kwargs: Object-specific properties to use as filter criteria.
+
+        Raises:
+            CacheMiss: If no items are returned from the cache.
+            MultipleCached: If more than one cached item is found.
 
         """
-        return get(id, **kwargs)
+        # Get the cached items.
+        cached = cls.filter(id, **kwargs)
+
+        # Check that only one item was found.
+        _check_single(cached, id, **kwargs)
+
+        return cached[0]
 
     @classmethod
     def filter(cls, id, **kwargs):
         """Proxy method to :meth:`mixbox.cache.getall`.
 
-        """
-        return getall(id, **kwargs)
+        This also performs type checks to ensure that the returned list
+        contains only items which are an instance of `cls`.
 
+        """
+        # Find all cached items that match the input criteria
+        cached = getall(id, **kwargs)
+
+        # Check objects of the correct type
+        return [x for x in cached if isinstance(x, cls)]
 
     def __setattr__(self, key, value):
         """Intercepts the object.__setattr__() and updates the mixbox
@@ -82,7 +103,8 @@ def _matches(obj, criteria):
 
     Args:
         obj: A Python object.
-        criteria: A tuple of attribute name/value pairs to compare object to.
+        criteria: A collection of attribute name/value pairs to compare
+            object to.
 
     Raises:
         AttributeError if `obj` does not contain an attribute that is used
@@ -96,7 +118,7 @@ def _matches(obj, criteria):
 
 
 def getall(key, **kwargs):
-    """Returns a tuple of cached objects that have property values that match
+    """Returns a list of cached objects that have property values that match
     the input filter parameters.
 
     Example:
@@ -115,10 +137,10 @@ def getall(key, **kwargs):
     if key not in _CACHE:
         return ()
 
-    # Need to convert the WeakSet to a tuple because the garbarge
-    # collector could possibly modifiy the cache while we're iterating over
+    # Need to convert the WeakSet to a list because the garbage
+    # collector could possibly modifiy the WeakSet while we're iterating over
     # it.
-    cached = tuple(_CACHE[key])
+    cached = list(_CACHE[key])
 
     if not kwargs:
         return cached
@@ -128,9 +150,28 @@ def getall(key, **kwargs):
 
     # Find all cached objects which have attr values that align with
     # the input kwargs.
-    filtered = tuple(x for x in cached if _matches(x, criteria))
+    filtered = [x for x in cached if _matches(x, criteria)]
 
     return filtered
+
+
+def _check_single(items, id, **kwargs):
+    """Checks that only one item is going to be returned from :meth:`get`.
+
+    Raises:
+        CacheMiss: If no object exists for the given criteria.
+        MultipleCached: If more than one object exists for the given criteria.
+
+    """
+    if len(items) == 1:
+        return 
+
+    if not items:
+        error = _CACHE_MISS_FMT % (id, kwargs)
+        raise CacheMiss(error)
+
+    error = _MULTIPLE_CACHED_FMT % (id, kwargs)
+    raise MultipleCached(error)
 
 
 def get(key, **kwargs):
@@ -148,17 +189,13 @@ def get(key, **kwargs):
         MultipleCached: If more than one object exists for the given critera.
 
     """
+    # Get the cached items
     cached = getall(key, **kwargs)
 
-    if len(cached) == 1:
-        return cached[0]
+    # Make sure only one item came back from getall()
+    _check_single(cached, key, **kwargs)
 
-    if not cached:
-        error = _CACHE_MISS_FMT % (key, kwargs)
-        raise CacheMiss(error)
-
-    error = _MULTIPLE_CACHED_FMT % (key, kwargs)
-    raise MultipleCached(error)
+    return cached[0]
 
 
 def remove(key, item):

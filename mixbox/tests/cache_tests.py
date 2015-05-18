@@ -29,6 +29,22 @@ class Foo(Cached):
         self._id = value
 
 
+class Bar(Cached):
+    def __init__(self, id_=None):
+        super(Bar, self).__init__()
+        self.id_ = id_
+        self.timestamp = None
+
+    @property
+    def id_(self):
+        return self._id
+
+    @id_.setter
+    def id_(self, value):
+        self._id = value
+
+
+
 class TestCached(unittest.TestCase):
 
     def tearDown(self):
