@@ -123,11 +123,11 @@ def getall(key, **kwargs):
 
     Example:
         >>> getall('example:Package-1')
-        (obj1, obj2, obj3)
+        [obj1, obj2, obj3]
         >>> getall('example:Package-1', timestamp=some_timestamp)
-        (obj1)
+        [obj1]
         >>> getall('example:Bad-ID')
-        ()
+        []
 
     Args:
         key: An object identifier. Usually is usually an ``id_`` value.
@@ -135,7 +135,7 @@ def getall(key, **kwargs):
 
     """
     if key not in _CACHE:
-        return ()
+        return []
 
     # Need to convert the WeakSet to a list because the garbage
     # collector could possibly modifiy the WeakSet while we're iterating over
@@ -249,4 +249,4 @@ def count():
     """Returns the number of objects currently in the mixbox cache.
 
     """
-    return sum(len(objlist) for objlist in six.itervalues(_CACHE))
+    return sum(len(items) for items in six.itervalues(_CACHE))
