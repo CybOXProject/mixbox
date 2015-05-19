@@ -60,8 +60,8 @@ class Cached(object):
         # Get the cached items.
         cached = cls.filter(id, **kwargs)
 
-        # Check that only one item was found.
-        _check_single(cached, id, **kwargs)
+        # Make sure only one item was found.
+        _assert_single(cached, id, **kwargs)
 
         return cached[0]
 
@@ -155,7 +155,7 @@ def getall(key, **kwargs):
     return filtered
 
 
-def _check_single(items, id, **kwargs):
+def _assert_single(items, id, **kwargs):
     """Checks that only one item is going to be returned from :meth:`get`.
 
     Raises:
@@ -193,7 +193,7 @@ def get(key, **kwargs):
     cached = getall(key, **kwargs)
 
     # Make sure only one item came back from getall()
-    _check_single(cached, key, **kwargs)
+    _assert_single(cached, key, **kwargs)
 
     return cached[0]
 
