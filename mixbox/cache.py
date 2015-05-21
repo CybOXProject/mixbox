@@ -213,6 +213,8 @@ def remove(key, item):
     cached = _CACHE[key]
     cached.discard(item)
 
+    # Remove the key if there are no associated cached items. This prevents
+    # uncontrolled growth of the dictionary key set.
     if not cached:
         del _CACHE[key]
 
