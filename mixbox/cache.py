@@ -93,7 +93,7 @@ class Cached(object):
         # If the attribute being set is our cache id key, update the cache
         if key == self._cached_id_key:
             # Should I call `getattr(self, key)` here too in case the value was
-            # mutated during super().__setattr__()?
+            # altered during super().__setattr__()?
             update(self, prev, value)
 
 
@@ -104,16 +104,20 @@ def _matches(obj, criteria):
     Args:
         obj: A Python object.
         criteria: A collection of attribute name/value pairs to compare
-            object to.
+            object to. These are built from the ``**kwargs`` passed into
+            :meth:`get` and :meth:`getall`.
 
     Raises:
-        AttributeError if `obj` does not contain an attribute that is used
-        in criteria.
+        AttributeError: if `obj` does not contain an attribute that is used
+            in criteria.
 
     """
     try:
-        return all(getattr(obj, k) == v for k, v in criteria)
+        return all(getattr(obj, attr) == val for attr, val in criteria)
     except (TypeError, ValueError):
+        # Comparing a datetime object that has a tzinfo with a datetime object
+        # that does not have a tzinfo raises a TypeError. These should be
+        # considered unequal.
         return False
 
 
@@ -124,28 +128,27 @@ def getall(key, **kwargs):
     Example:
         >>> getall('example:Package-1')
         [obj1, obj2, obj3]
-        >>> getall('example:Package-1', timestamp=some_timestamp)
+        >>> getall('example:Package-1', timestamp=foo_timestamp)
         [obj1]
         >>> getall('example:Bad-ID')
         []
 
     Args:
         key: An object identifier. Usually is usually an ``id_`` value.
-        **kwargs: Other attribute name/value pairs to look for.
+        **kwargs: Object-specific properties to use as filter criteria.
 
     """
     if key not in _CACHE:
         return []
 
-    # Need to convert the WeakSet to a list because the garbage
-    # collector could possibly modifiy the WeakSet while we're iterating over
-    # it.
+    # Need to convert the WeakSet to a list because the garbage collector could
+    # potentially modify the WeakSet while we're iterating over it.
     cached = list(_CACHE[key])
 
     if not kwargs:
         return cached
 
-    # Shortening line length
+    # Use items() because criteria may be used in iterative calls to _matches().
     criteria = kwargs.items()
 
     # Find all cached objects which have attr values that align with
@@ -155,8 +158,13 @@ def getall(key, **kwargs):
     return filtered
 
 
-def _assert_single(items, id, **kwargs):
+def _assert_single(items, key, **kwargs):
     """Checks that only one item is going to be returned from :meth:`get`.
+
+    Args:
+        items: A list of cached objects.
+        key: The key used to resolve the cached objects.
+        **kwargs: The filter criteria used to collect the cached objects.
 
     Raises:
         CacheMiss: If no object exists for the given criteria.
@@ -167,10 +175,10 @@ def _assert_single(items, id, **kwargs):
         return 
 
     if not items:
-        error = _CACHE_MISS_FMT % (id, kwargs)
+        error = _CACHE_MISS_FMT % (key, kwargs)
         raise CacheMiss(error)
 
-    error = _MULTIPLE_CACHED_FMT % (id, kwargs)
+    error = _MULTIPLE_CACHED_FMT % (key, kwargs)
     raise MultipleCached(error)
 
 
