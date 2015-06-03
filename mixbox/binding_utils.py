@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 
 import base64
+import collections
 import contextlib
 from datetime import datetime, tzinfo, timedelta
 import re
@@ -12,6 +13,7 @@ from xml.sax import saxutils
 from lxml import etree as etree_
 
 from .vendor import six
+from .xml import TAG_XSI_TYPE, get_xml_parser
 
 CDATA_START = "<![CDATA["
 CDATA_END = "]]>"
@@ -40,14 +42,14 @@ def parsexml_(*args, **kwargs):
     if 'parser' not in kwargs:
         # Use the lxml ElementTree compatible parser so that, e.g.,
         # we ignore comments.
-        kwargs['parser'] = etree_.ETCompatXMLParser(huge_tree=True)
+        kwargs['parser'] = get_xml_parser()
     return etree_.parse(*args, **kwargs)
 
 
 class _FixedOffsetTZ(tzinfo):
 
     def __init__(self, offset, name):
-        self.__offset = timedelta(minutes = offset)
+        self.__offset = timedelta(minutes=offset)
         self.__name = name
 
     def utcoffset(self, dt):
@@ -142,10 +144,10 @@ class GeneratedsSuper(object):
     def gds_validate_boolean_list(self, input_data, node, input_name=''):
         values = input_data.split()
         for value in values:
-            if value not in ('true', '1', 'false', '0', ):
-                raise_parse_error(node,
-                    'Requires sequence of booleans '
-                    '("true", "1", "false", "0")')
+            bool_list = ('true', '1', 'false', '0')
+            if value not in bool_list:
+                msg = "Requires sequence of booleans {0}".format(bool_list)
+                raise_parse_error(node, msg)
         return input_data
 
     def gds_validate_datetime(self, input_data, node, input_name=''):
@@ -193,7 +195,7 @@ class GeneratedsSuper(object):
             dt = datetime.strptime(input_data, '%Y-%m-%dT%H:%M:%S.%f')
         else:
             dt = datetime.strptime(input_data, '%Y-%m-%dT%H:%M:%S')
-        return dt.replace(tzinfo = tz)
+        return dt.replace(tzinfo=tz)
 
     def gds_validate_date(self, input_data, node, input_name=''):
         return input_data
@@ -233,7 +235,7 @@ class GeneratedsSuper(object):
                     tzoff *= -1
                 tz = _FixedOffsetTZ(tzoff, results.group(0))
                 input_data = input_data[:-6]
-        return datetime.strptime(input_data, '%Y-%m-%d').replace(tzinfo = tz)
+        return datetime.strptime(input_data, '%Y-%m-%d').replace(tzinfo=tz)
 
     def gds_str_lower(self, instring):
         return instring.lower()
@@ -370,7 +372,7 @@ class GDSParseError(Exception):
 
 
 def raise_parse_error(node, msg):
-    msg = '%s (element %s/line %d)' % (msg, node.tag, node.sourceline, )
+    msg = '%s (element %s/line %d)' % (msg, node.tag, node.sourceline)
     raise GDSParseError(msg)
 
 
@@ -381,17 +383,19 @@ def _cast(typ, value):
 
 
 __all__ = [
+    'CDATA_END',
+    'CDATA_START',
+    'ExternalEncoding',
+    'GeneratedsSuper',
+    'Tag_pattern_',
     '_cast',
     'etree_',
-    'ExternalEncoding',
     'find_attr_value_',
     'get_all_text_',
     'parsexml_',
-    'quote_xml',
     'quote_attrib',
     'quote_python',
+    'quote_xml',
     'raise_parse_error',
-    'showIndent',
-    'Tag_pattern_',
-    'GeneratedsSuper',
+    'showIndent'
 ]
