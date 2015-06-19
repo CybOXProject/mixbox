@@ -19,3 +19,7 @@ class TestTypedField(unittest.TestCase):
         self.assertEqual("From", a.name)
         self.assertEqual("from", a.key_name)
         self.assertEqual("from_", a.attr_name)
+
+
+if __name__ == "__main__":
+    unittest.main()
