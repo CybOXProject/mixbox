@@ -55,8 +55,8 @@ class TypedField(object):
 
         return instance._fields.get(self.name, [] if self.multiple else None)
 
-    def _handle_value(self, value):
-        """Handles the processing of the __set__ value."""
+    def _clean(self, value):
+        """Validate and clean a candidate value for this field."""
         if value is None:
             return None
         elif self.type_ is None:
@@ -84,11 +84,11 @@ class TypedField(object):
             if value is None:
                 value = []
             elif not is_sequence(value):
-                value = [self._handle_value(value)]
+                value = [self._clean(value)]
             else:
-                value = [self._handle_value(x) for x in value if x is not None]
+                value = [self._clean(x) for x in value if x is not None]
         else:
-            value = self._handle_value(value)
+            value = self._clean(value)
 
         if self.preset_hook:
             self.preset_hook(instance, value)
