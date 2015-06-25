@@ -10,28 +10,42 @@ from .datautils import is_sequence
 
 class TypedField(object):
 
-    def __init__(self, name, type_=None, callback_hook=None, key_name=None,
-                 comparable=True, multiple=False):
+    def __init__(self, name, type_=None,
+                 key_name=None, comparable=True, multiple=False,
+                 preset_hook=None, postset_hook=None):
         """
         Create a new field.
 
-        - `name` is the name of the field in the Binding class
-        - `type_` is the type that objects assigned to this field must be.
-          If `None`, no type checking is performed.
-        - `key_name` is only needed if the desired key for the dictionary
-          representation is differen than the lower-case version of `name`
-        - `comparable` (boolean) - whether this field should be considered
-          when checking Entities for equality. Default is True. If false, this
-          field is not considered
-        - `multiple` (boolean) - Whether multiple instances of this field can
-          exist on the Entity.
+        Args:
+            `name` (str): name of the field as contained in the binding class.
+            `type_` (type): Required type for values assigned to this field. If
+                `None`, no type checking is performed.
+            `key_name` (str): name for field when represented as a dictionary.
+                (Optional) If omitted, `name.lower()` will be used.
+            `comparable` (boolean): whether this field should be considered
+                when checking Entities for equality. Default is True. If False,
+                this field is not considered.
+            `multiple` (boolean): Whether multiple instances of this field can
+                exist on the Entity.
+            `preset_hook` (callable): called before assigning a value to this
+                field, but after type checking is performed (if applicable).
+                This should typically be used to perform additional validation
+                checks on the value, perhaps based on current state of the
+                instance. The callable should accept two arguments: (1) the
+                instance object being modified, and (2)the value it is being
+                set to.
+            `postset_hook` (callable): similar to `preset_hook` (and takes the
+                same arguments), but is called after setting the value. This
+                can be used, for example, to modify other fields of the
+                instance to maintain some type of invariant.
         """
         self.name = name
         self.type_ = type_
-        self.callback_hook = callback_hook
         self._key_name = key_name
         self.comparable = comparable
         self.multiple = multiple
+        self.preset_hook = preset_hook
+        self.postset_hook = postset_hook
 
     def __get__(self, instance, owner):
         # If we are calling this on a class, we want the actual Field, not its
@@ -42,9 +56,7 @@ class TypedField(object):
         return instance._fields.get(self.name, [] if self.multiple else None)
 
     def _handle_value(self, value):
-        """Handles the processing of the __set__ value.
-
-        """
+        """Handles the processing of the __set__ value."""
         if value is None:
             return None
         elif self.type_ is None:
@@ -67,22 +79,24 @@ class TypedField(object):
 
         If the field is ``multiple``, an attempt is made to convert `value`
         into a list if it is not an iterable type.
-
         """
         if self.multiple:
             if value is None:
-                processed = []
+                value = []
             elif not is_sequence(value):
-                processed = [self._handle_value(value)]
+                value = [self._handle_value(value)]
             else:
-                processed = [self._handle_value(x) for x in value if x is not None]
+                value = [self._handle_value(x) for x in value if x is not None]
         else:
-            processed = self._handle_value(value)
+            value = self._handle_value(value)
 
-        instance._fields[self.name] = processed
+        if self.preset_hook:
+            self.preset_hook(instance, value)
 
-        if self.callback_hook:
-            self.callback_hook(instance)
+        instance._fields[self.name] = value
+
+        if self.postset_hook:
+            self.postset_hook(instance, value)
 
     def __str__(self):
         return self.attr_name
