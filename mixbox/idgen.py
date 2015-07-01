@@ -4,6 +4,7 @@
 """Methods for generating IDs"""
 
 import uuid
+import contextlib
 
 from .namespaces import Namespace
 
@@ -25,7 +26,7 @@ class IDGenerator(object):
     METHOD_UUID = 1
     METHOD_INT = 2
 
-    METHODS = (METHOD_UUID, METHOD_INT)
+    METHODS = (METHOD_UUID, METHOD_INT,)
 
     def __init__(self, namespace=EXAMPLE_NAMESPACE, method=METHOD_UUID):
         self.namespace = namespace
@@ -69,12 +70,12 @@ class IDGenerator(object):
             id_ = self.next_int
             self.next_int += 1
         else:
-            raise InvalidMethodError()
+            raise InvalidMethodError(self.method)
 
         return "%s:%s-%s" % (self.namespace.prefix, prefix, id_)
 
-# Singleton instance within this module. It is lazily instantiated, so simply
-# importing the utils module will not create the object.
+#: Singleton instance within this module. It is lazily instantiated, so simply
+#: importing the utils module will not create the object.
 __generator = None
 
 
@@ -120,3 +121,13 @@ def create_id(prefix=None):
         return _get_generator().create_id()
     else:
         return _get_generator().create_id(prefix)
+
+
+@contextlib.contextmanager
+def temp_id_namespace(namespace):
+    try:
+        saved_id_namespace = {get_id_namespace(): get_id_namespace_alias()}
+        set_id_namespace(namespace)
+        yield
+    finally:
+        set_id_namespace(saved_id_namespace)
