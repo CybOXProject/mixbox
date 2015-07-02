@@ -5,6 +5,7 @@ import collections
 import inspect
 import json
 
+from . import idgen
 from .binding_utils import save_encoding
 from .fields import TypedField
 from .namespaces import Namespace, lookup_name, lookup_prefix
@@ -306,8 +307,7 @@ class Entity(object):
             for ns, prefix in six.iteritems(additional_ns_dict):
                 namespaces.update([Namespace(ns, prefix)])
 
-        # TODO: figure out how to add the namespace used for generated IDs
-        # namespaces.update([cybox.utils.idgen._get_generator().namespace])
+        namespaces.update([idgen._get_generator().namespace])
 
         # if there are any other namepaces, include xsi for "schemaLocation"
         if namespaces:

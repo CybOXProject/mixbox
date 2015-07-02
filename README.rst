@@ -25,3 +25,13 @@ To set up an environment to develop `mixbox`:
 
 Then you can make changes to the `mixbox` library and ensure the test cases for
 the corresponding projects continue to pass (using `tox` or `nosetests`).
+
+Releasing
+---------
+
+.. code:: bash
+
+    $ bumpversion patch
+    $ rm dist/*
+    $ python setup.py sdist --formats=gztar,zip
+    $ twine upload dist/*
