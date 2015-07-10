@@ -115,7 +115,10 @@ NS_XML_DSIG = Namespace('http://www.w3.org/2000/09/xmldsig#', 'ds', '')
 NS_XML_SCHEMA = Namespace('http://www.w3.org/2001/XMLSchema', 'xs', '')
 NS_XML_SCHEMA_INSTANCE = Namespace('http://www.w3.org/2001/XMLSchema-instance', 'xsi', '')
 
+XML_NAMESPACES = NamespaceSet()
+
 # Magic to automatically register all Namespaces defined in this module.
 for k, v in dict(globals()).items():
     if k.startswith('NS_'):
         register_namespace(v)
+        XML_NAMESPACES.add(v)
