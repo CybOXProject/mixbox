@@ -7,6 +7,7 @@ import json
 
 from . import idgen
 from .binding_utils import save_encoding
+from .datautils import is_sequence
 from .fields import TypedField
 from .namespaces import Namespace, lookup_name, lookup_prefix
 from .namespaces import get_xmlns_string, get_schemaloc_string
@@ -390,11 +391,17 @@ class EntityList(collections.MutableSequence, Entity):
         super(EntityList, self).__init__()
         self._inner = []
 
+        if not any(args):
+            return
+
         for arg in args:
-            if isinstance(arg, list):
+            if is_sequence(arg):
                 self.extend(arg)
             else:
                 self.append(arg)
+
+    def __nonzero__(self):
+        return bool(self._inner)
 
     def __getitem__(self, key):
         return self._inner.__getitem__(key)
@@ -411,6 +418,8 @@ class EntityList(collections.MutableSequence, Entity):
         return len(self._inner)
 
     def insert(self, idx, value):
+        if not value:
+            return
         if not self._is_valid(value):
             value = self._fix_value(value)
         self._inner.insert(idx, value)
@@ -431,8 +440,15 @@ class EntityList(collections.MutableSequence, Entity):
         try:
             new_value = self._contained_type(value)
         except:
-            raise ValueError("Can't put '%s' (%s) into a %s" %
-                (value, type(value), self.__class__))
+            error = "Can't put '{0}' ({1}) into a {2}. Expected a {3} object."
+            error = error.format(
+                value,                  # Input value
+                type(value),            # Type of input value
+                type(self),             # Type of collection
+                self._contained_type    # Expected type of input value
+            )
+            raise ValueError(error)
+
         return new_value
 
     # The next four functions can be overridden, but otherwise define the
@@ -492,4 +508,3 @@ class EntityList(collections.MutableSequence, Entity):
     def list_from_object(cls, entitylist_obj):
         """Convert from object representation to list representation."""
         return cls.from_obj(entitylist_obj).to_list()
-
