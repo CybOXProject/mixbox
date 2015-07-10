@@ -43,10 +43,14 @@ class NamespaceSet(MutableSet):
     with the same prefix but different URIs. But YAGNI, for now.
     """
 
-    def __init__(self):
+    def __init__(self, iterable=None):
         self._inner = set()
         self.name_dict = {}
         self.prefix_dict = {}
+        if not iterable:
+            return
+        for item in iterable:
+            self.add(item)
 
     def __contains__(self, value):
         return self._inner.__contains__(value)
@@ -69,12 +73,30 @@ class NamespaceSet(MutableSet):
     def discard(self, value):
         raise TypeError("NamespaceSet does not support removing Namespaces")
 
+    @property
+    def ns_map(self):
+        """A mapping of name to prefix for items in this set."""
+        return {x.name: x.prefix for x in self}
+
+    @property
+    def prefix_map(self):
+        """A mapping of prefix to name for items in this set."""
+        return {x.prefix: x.name for x in self}
+
+    @property
+    def schemaloc_map(self):
+        """A mapping of name to schema_location for items in this set.
+
+        Only Namespaces that have a defined schema_location are included.
+        """
+        return {x.name: x.schema_location for x in self if x.schema_location}
+
 
 __ALL_NAMESPACES = NamespaceSet()
 
 
 def register_namespace(namespace):
-    """Register a new Namespace"""
+    """Register a new Namespace with the global NamespaceSet."""
 
     __ALL_NAMESPACES.add(namespace)
 
@@ -85,6 +107,21 @@ def lookup_name(name):
 
 def lookup_prefix(prefix):
     return __ALL_NAMESPACES.prefix_dict[prefix]
+
+
+def get_full_ns_map():
+    """Return a name: prefix mapping for all registered Namespaces."""
+    return __ALL_NAMESPACES.ns_map
+
+
+def get_full_prefix_map():
+    """Return a prefix: name mapping for all registered Namespaces."""
+    return __ALL_NAMESPACES.prefix_map
+
+
+def get_full_schemaloc_map():
+    """Return a name: schemalocation mapping for all registered Namespaces."""
+    return __ALL_NAMESPACES.schemaloc_map
 
 
 def get_xmlns_string(ns_set):
