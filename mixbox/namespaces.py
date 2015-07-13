@@ -76,12 +76,12 @@ class NamespaceSet(MutableSet):
     @property
     def ns_map(self):
         """A mapping of name to prefix for items in this set."""
-        return {x.name: x.prefix for x in self}
+        return dict((x.name, x.prefix) for x in self)
 
     @property
     def prefix_map(self):
         """A mapping of prefix to name for items in this set."""
-        return {x.prefix: x.name for x in self}
+        return dict((x.prefix, x.name) for x in self)
 
     @property
     def schemaloc_map(self):
@@ -89,7 +89,8 @@ class NamespaceSet(MutableSet):
 
         Only Namespaces that have a defined schema_location are included.
         """
-        return {x.name: x.schema_location for x in self if x.schema_location}
+        return dict((x.name, x.schema_location) for x in self
+                    if x.schema_location)
 
 
 __ALL_NAMESPACES = NamespaceSet()
