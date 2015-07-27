@@ -94,7 +94,7 @@ class Cached(object):
         if key == self._cached_id_key:
             # Should I call `getattr(self, key)` here too in case the value was
             # altered during super().__setattr__()?
-            update(self, prev, value)
+            update(item=self, old=prev, new=value)
 
 
 def _matches(obj, criteria):
@@ -260,3 +260,15 @@ def count():
 
     """
     return sum(len(items) for items in six.itervalues(_CACHE))
+
+
+def instanceof(cls):
+    """Returns all cached objects that are instances of the input `cls`.
+    """
+    instances = []
+
+    for cached in _CACHE.itervalues():
+        objects = list(cached)  # Temporarily create strong refs
+        instances.extend(x for x in objects if isinstance(x, cls))
+
+    return instances

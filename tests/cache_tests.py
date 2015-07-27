@@ -122,5 +122,17 @@ class TestCached(unittest.TestCase):
         self.assertEqual(cache.count(), 0)
 
 
+    def test_instanceof(self):
+        l = [Foo(id_=x) for x in six.moves.range(5)]
+        self.assertEqual(len(l), len(cache.instanceof(Foo)))
+
+        # No Bar objects have been created yet.
+        self.assertEqual(0, len(cache.instanceof(Bar)))
+
+        # Make one Bar object and check the cache
+        b = Bar(id_="bar-1")
+        self.assertEqual(1, len(cache.instanceof(Bar)))
+
+
 if __name__ == "__main__":
     unittest.main()
