@@ -34,6 +34,18 @@ def __is_dead(ref):
     return ref() is None
 
 
+def __make_id(receiver):
+    """Generates an identifier for a signal receiver function/method.
+
+    This is used when disconnecting receivers, where we need to correctly
+    establish equivalence between the input receiver and the receivers assigned
+    to a signal.
+    """
+    if __is_bound_method(receiver):
+        return (id(receiver.__func__), id(receiver.__self__))
+    return id(receiver)
+
+
 def __purge():
     """Removes all dead signal receivers from the global receivers collection.
 
@@ -123,6 +135,7 @@ def disconnect(signal_id, receiver):
         func: The receiver to disconnect
     """
     disconnected = False
+    inputkey = __make_id(receiver)
 
     with __lock:
         __purge()
@@ -131,7 +144,7 @@ def disconnect(signal_id, receiver):
         for idx in six.moves.range(len(receivers)):
             connected = receivers[idx]()
 
-            if receiver == connected:
+            if inputkey == __make_id(connected):
                 disconnected = True
                 del receivers[idx]
                 break
