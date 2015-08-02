@@ -3,6 +3,10 @@
 """
 The signals module contains code which supports the registration of signal
 handlers, as well as the emitting of signals.
+
+Attribution:
+    Much of the code here was inspired by Django signals:
+    https://github.com/django/django/blob/1.8.3/django/dispatch/dispatcher.py
 """
 import collections
 import logging
