@@ -35,7 +35,7 @@ def __is_dead(ref):
 
 
 def __make_id(receiver):
-    """Generates an identifier for a signal receiver function/method.
+    """Generate an identifier for a signal receiver function/method.
 
     This is used when disconnecting receivers, where we need to correctly
     establish equivalence between the input receiver and the receivers assigned
@@ -47,7 +47,7 @@ def __make_id(receiver):
 
 
 def __purge():
-    """Removes all dead signal receivers from the global receivers collection.
+    """Remove all dead signal receivers from the global receivers collection.
 
     Note:
         It is assumed that the caller holds the __lock.
@@ -91,7 +91,7 @@ def __is_bound_method(method):
 
 
 def __check_receiver(func):
-    """Checks that the `func` is an acceptable signal receiver.
+    """Check that the `func` is an acceptable signal receiver.
 
     Signal receivers must be one of the following:
 
@@ -112,7 +112,7 @@ def __check_receiver(func):
 
 
 def connect(signal_id, receiver):
-    """Registers `receiver` method/function as a receiver for the signal
+    """Register `receiver` method/function as a receiver for the signal
     `signal_id`."""
     __check_receiver(receiver)
 
@@ -127,7 +127,7 @@ def connect(signal_id, receiver):
 
 
 def disconnect(signal_id, receiver):
-    """Disconnects the receiver `func` from the signal, identified by
+    """Disconnect the receiver `func` from the signal, identified by
     `signal_id`.
 
     Args:
@@ -166,9 +166,8 @@ def receiver(signal_id):
 
 
 def emit(signal_id, *args, **kwargs):
-    """Emits an signal by serially calling each registered signal receiver for
+    """Emit a signal by serially calling each registered signal receiver for
     the signal `signal_name`.
-
     """
     if signal_id not in __receivers:
         return
