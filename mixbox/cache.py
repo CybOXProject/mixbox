@@ -94,7 +94,7 @@ class Cached(object):
         if key == self._cached_id_key:
             # Should I call `getattr(self, key)` here too in case the value was
             # altered during super().__setattr__()?
-            update(self, prev, value)
+            update(item=self, oldkey=prev, newkey=value)
 
 
 def _matches(obj, criteria):
@@ -233,14 +233,15 @@ def add(key, item):
     Args:
         item: The item to insert into the cache.
         key: The key for the cached item (an id).
-
     """
     _CACHE[key].add(item)
 
 
-def update(item, old, new):
-    """Updates the mixbox object cache. This will remove `obj` from the
-    its old ID group in the cache and insert it into the new ID group.
+def update(item, oldkey, newkey):
+    """Update the mixbox object cache.
+
+    This will remove `obj` from the its old ID group in the cache and insert
+    it into the new ID group.
 
     Args:
         item: The cached item.
@@ -249,14 +250,23 @@ def update(item, old, new):
 
     """
     # Remove the old entry
-    remove(old, item)
+    remove(oldkey, item)
 
     # Add the new entry
-    add(new, item)
+    add(newkey, item)
 
 
 def count():
-    """Returns the number of objects currently in the mixbox cache.
-
-    """
+    """Return the number of objects currently in the mixbox cache."""
     return sum(len(items) for items in six.itervalues(_CACHE))
+
+
+def instanceof(cls):
+    """Return all cached objects that are instances of the input `cls`."""
+    instances = []
+
+    for cached in six.itervalues(_CACHE):
+        objects = list(cached)  # Temporarily create strong refs
+        instances.extend(x for x in objects if isinstance(x, cls))
+
+    return instances
