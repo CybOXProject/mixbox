@@ -50,14 +50,13 @@ class Entity(object):
     def __init__(self):
         self._fields = {}
 
-    @classmethod
-    def _get_vars(cls):
-        var_list = []
-        for (name, obj) in inspect.getmembers(cls, inspect.isdatadescriptor):
-            if isinstance(obj, TypedField):
-                var_list.append(obj)
+    @property
+    def typed_fields(self):
+        """Returns a generator over this entity's TypedFields."""
 
-        return var_list
+        for typed_field in inspect.getmembers(self.__class__,
+                                              lambda m: isinstance(m, TypedField)):
+            yield typed_field[1]
 
     def __eq__(self, other):
         # This fixes some strange behavior where an object isn't equal to
@@ -71,7 +70,7 @@ class Entity(object):
         if self.__class__ != other.__class__:
             return False
 
-        var_list = self.__class__._get_vars()
+        var_list = list(self.typed_fields)
 
         # If there are no TypedFields, assume this class hasn't been
         # "TypedField"-ified, so we don't want these to inadvertently return
@@ -110,13 +109,7 @@ class Entity(object):
 
         entity_obj = self._binding_class()
 
-        members = {}
-        for klass in self.__class__.__mro__:
-            if klass is Entity:
-                break
-            members.update(vars(klass))
-
-        for field in six.itervalues(members):
+        for field in self.typed_fields:
             if isinstance(field, TypedField):
                 val = getattr(self, field.attr_name)
 
@@ -149,13 +142,8 @@ class Entity(object):
             Python dict with keys set from this Entity.
         """
         entity_dict = {}
-        members = {}
-        for klass in self.__class__.__mro__:
-            if klass is Entity:
-                break
-            members.update(vars(klass))
 
-        for field in six.itervalues(members):
+        for field in self.typed_fields:
             if isinstance(field, TypedField):
                 val = getattr(self, field.attr_name)
 
@@ -189,7 +177,7 @@ class Entity(object):
 
         entity = cls()
 
-        for field in cls._get_vars():
+        for field in entity.typed_fields:
             val = getattr(cls_obj, field.name)
             if field.type_:
                 if field.multiple and val is not None:
@@ -217,7 +205,7 @@ class Entity(object):
                 raise TypeError("Could not instantiate a %s from a %s: %s" %
                                 (cls, type(value), value))
 
-        for field in cls._get_vars():
+        for field in entity.typed_fields:
             val = cls_dict.get(field.key_name)
             if field.type_:
                 if issubclass(field.type_, EntityList):
