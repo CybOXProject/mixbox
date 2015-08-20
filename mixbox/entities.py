@@ -110,18 +110,17 @@ class Entity(object):
         entity_obj = self._binding_class()
 
         for field in self.typed_fields:
-            if isinstance(field, TypedField):
-                val = getattr(self, field.attr_name)
+            val = getattr(self, field.attr_name)
 
-                if field.multiple:
-                    if val:
-                        val = [_objectify(x, return_obj, ns_info) for x in val]
-                    else:
-                        val = []
+            if field.multiple:
+                if val:
+                    val = [_objectify(x, return_obj, ns_info) for x in val]
                 else:
-                    val = _objectify(val, return_obj, ns_info)
+                    val = []
+            else:
+                val = _objectify(val, return_obj, ns_info)
 
-                setattr(entity_obj, field.name, val)
+            setattr(entity_obj, field.name, val)
 
         self._finalize_obj(entity_obj)
         return entity_obj
@@ -144,20 +143,19 @@ class Entity(object):
         entity_dict = {}
 
         for field in self.typed_fields:
-            if isinstance(field, TypedField):
-                val = getattr(self, field.attr_name)
+            val = getattr(self, field.attr_name)
 
-                if field.multiple:
-                    if val:
-                        val = [_dictify(x) for x in val]
-                    else:
-                        val = []
+            if field.multiple:
+                if val:
+                    val = [_dictify(x) for x in val]
                 else:
-                    val = _dictify(val)
+                    val = []
+            else:
+                val = _dictify(val)
 
-                # Only add non-None objects or non-empty lists
-                if val is not None and val != []:
-                    entity_dict[field.key_name] = val
+            # Only add non-None objects or non-empty lists
+            if val is not None and val != []:
+                entity_dict[field.key_name] = val
 
         self._finalize_dict(entity_dict)
 
