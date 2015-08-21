@@ -53,7 +53,7 @@ class TypedField(object):
         if not instance:
             return self
 
-        return instance._fields.get(self.name, [] if self.multiple else None)
+        return instance._fields.get(self, [] if self.multiple else None)
 
     def _clean(self, value):
         """Validate and clean a candidate value for this field."""
@@ -93,7 +93,7 @@ class TypedField(object):
         if self.preset_hook:
             self.preset_hook(instance, value)
 
-        instance._fields[self.name] = value
+        instance._fields[self] = value
 
         if self.postset_hook:
             self.postset_hook(instance, value)

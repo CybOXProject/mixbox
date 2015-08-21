@@ -49,14 +49,22 @@ class Entity(object):
 
     def __init__(self):
         self._fields = {}
+        self._typed_fields = None
+
+    @classmethod
+    def _iter_typed_fields(cls):
+        is_field = lambda x: isinstance(x, TypedField)
+
+        for name, field in inspect.getmembers(cls, predicate=is_field):
+            yield field
 
     @property
     def typed_fields(self):
-        """Returns a generator over this entity's TypedFields."""
+        """Return a list of this entity's TypedFields."""
+        if self._typed_fields is None:
+            self._typed_fields = list(self._iter_typed_fields())
 
-        for typed_field in inspect.getmembers(self.__class__,
-                                              lambda m: isinstance(m, TypedField)):
-            yield typed_field[1]
+        return self._typed_fields
 
     def __eq__(self, other):
         # This fixes some strange behavior where an object isn't equal to
@@ -109,9 +117,7 @@ class Entity(object):
 
         entity_obj = self._binding_class()
 
-        for field in self.typed_fields:
-            val = getattr(self, field.attr_name)
-
+        for field, val in six.iteritems(self._fields):
             if field.multiple:
                 if val:
                     val = [_objectify(x, return_obj, ns_info) for x in val]
@@ -142,9 +148,7 @@ class Entity(object):
         """
         entity_dict = {}
 
-        for field in self.typed_fields:
-            val = getattr(self, field.attr_name)
-
+        for field, val in six.iteritems(self._fields):
             if field.multiple:
                 if val:
                     val = [_dictify(x) for x in val]
@@ -177,6 +181,7 @@ class Entity(object):
 
         for field in entity.typed_fields:
             val = getattr(cls_obj, field.name)
+
             if field.type_:
                 if field.multiple and val is not None:
                     val = [field.type_.from_obj(x) for x in val]
