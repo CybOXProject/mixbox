@@ -49,15 +49,22 @@ class Entity(object):
 
     def __init__(self):
         self._fields = {}
+        self._typed_fields = None
 
     @classmethod
-    def _get_vars(cls):
-        var_list = []
-        for (name, obj) in inspect.getmembers(cls, inspect.isdatadescriptor):
-            if isinstance(obj, TypedField):
-                var_list.append(obj)
+    def _iter_typed_fields(cls):
+        is_field = lambda x: isinstance(x, TypedField)
 
-        return var_list
+        for name, field in inspect.getmembers(cls, predicate=is_field):
+            yield field
+
+    @property
+    def typed_fields(self):
+        """Return a list of this entity's TypedFields."""
+        if self._typed_fields is None:
+            self._typed_fields = list(self._iter_typed_fields())
+
+        return self._typed_fields
 
     def __eq__(self, other):
         # This fixes some strange behavior where an object isn't equal to
@@ -71,18 +78,16 @@ class Entity(object):
         if self.__class__ != other.__class__:
             return False
 
-        var_list = self.__class__._get_vars()
-
         # If there are no TypedFields, assume this class hasn't been
         # "TypedField"-ified, so we don't want these to inadvertently return
         # equal.
-        if not var_list:
+        if not self.typed_fields:
             return False
 
-        for f in var_list:
+        for f in self.typed_fields:
             if not f.comparable:
                 continue
-            if getattr(self, f.attr_name) != getattr(other, f.attr_name):
+            if f.__get__(self) != f.__get__(other):
                 return False
 
         return True
@@ -110,25 +115,16 @@ class Entity(object):
 
         entity_obj = self._binding_class()
 
-        members = {}
-        for klass in self.__class__.__mro__:
-            if klass is Entity:
-                break
-            members.update(vars(klass))
-
-        for field in six.itervalues(members):
-            if isinstance(field, TypedField):
-                val = getattr(self, field.attr_name)
-
-                if field.multiple:
-                    if val:
-                        val = [_objectify(x, return_obj, ns_info) for x in val]
-                    else:
-                        val = []
+        for field, val in six.iteritems(self._fields):
+            if field.multiple:
+                if val:
+                    val = [_objectify(x, return_obj, ns_info) for x in val]
                 else:
-                    val = _objectify(val, return_obj, ns_info)
+                    val = []
+            else:
+                val = _objectify(val, return_obj, ns_info)
 
-                setattr(entity_obj, field.name, val)
+            setattr(entity_obj, field.name, val)
 
         self._finalize_obj(entity_obj)
         return entity_obj
@@ -149,27 +145,19 @@ class Entity(object):
             Python dict with keys set from this Entity.
         """
         entity_dict = {}
-        members = {}
-        for klass in self.__class__.__mro__:
-            if klass is Entity:
-                break
-            members.update(vars(klass))
 
-        for field in six.itervalues(members):
-            if isinstance(field, TypedField):
-                val = getattr(self, field.attr_name)
-
-                if field.multiple:
-                    if val:
-                        val = [_dictify(x) for x in val]
-                    else:
-                        val = []
+        for field, val in six.iteritems(self._fields):
+            if field.multiple:
+                if val:
+                    val = [_dictify(x) for x in val]
                 else:
-                    val = _dictify(val)
+                    val = []
+            else:
+                val = _dictify(val)
 
-                # Only add non-None objects or non-empty lists
-                if val is not None and val != []:
-                    entity_dict[field.key_name] = val
+            # Only add non-None objects or non-empty lists
+            if val is not None and val != []:
+                entity_dict[field.key_name] = val
 
         self._finalize_dict(entity_dict)
 
@@ -189,15 +177,16 @@ class Entity(object):
 
         entity = cls()
 
-        for field in cls._get_vars():
+        for field in entity.typed_fields:
             val = getattr(cls_obj, field.name)
+
             if field.type_:
                 if field.multiple and val is not None:
                     val = [field.type_.from_obj(x) for x in val]
                 else:
                     val = field.type_.from_obj(val)
-            setattr(entity, field.attr_name, val)
 
+            field.__set__(entity, val)
         return entity
 
     @classmethod
@@ -217,7 +206,7 @@ class Entity(object):
                 raise TypeError("Could not instantiate a %s from a %s: %s" %
                                 (cls, type(value), value))
 
-        for field in cls._get_vars():
+        for field in entity.typed_fields:
             val = cls_dict.get(field.key_name)
             if field.type_:
                 if issubclass(field.type_, EntityList):
@@ -232,7 +221,9 @@ class Entity(object):
             else:
                 if field.multiple and not val:
                     val = []
-            setattr(entity, field.attr_name, val)
+
+            # Set the value
+            field.__set__(entity, val)
 
         return entity
 

@@ -47,13 +47,13 @@ class TypedField(object):
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance, owner=None):
         # If we are calling this on a class, we want the actual Field, not its
         # value
         if not instance:
             return self
 
-        return instance._fields.get(self.name, [] if self.multiple else None)
+        return instance._fields.get(self, [] if self.multiple else None)
 
     def _clean(self, value):
         """Validate and clean a candidate value for this field."""
@@ -93,13 +93,13 @@ class TypedField(object):
         if self.preset_hook:
             self.preset_hook(instance, value)
 
-        instance._fields[self.name] = value
+        instance._fields[self] = value
 
         if self.postset_hook:
             self.postset_hook(instance, value)
 
     def __str__(self):
-        return self.attr_name
+        return self.name
 
     @property
     def key_name(self):
@@ -107,26 +107,3 @@ class TypedField(object):
             return self._key_name
         else:
             return self.name.lower()
-
-    @property
-    def attr_name(self):
-        """The name of this field as an attribute name.
-
-        This is identical to the key_name, unless the key name conflicts with
-        a builtin Python keyword, in which case a single underscore is
-        appended.
-
-        This should match the name given to the TypedField class variable (see
-        examples below), but this is not enforced.
-
-        Examples:
-            data = cybox.TypedField("Data", String)
-            from_ = cybox.TypedField("From", String)
-        """
-
-        attr = self.key_name
-        # TODO: expand list with other Python keywords
-        if attr in ('from', 'class', 'type', 'with', 'for', 'id', 'type',
-                'range'):
-            attr = attr + "_"
-        return attr
