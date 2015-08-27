@@ -78,15 +78,13 @@ class Entity(object):
         if self.__class__ != other.__class__:
             return False
 
-        var_list = list(self.typed_fields)
-
         # If there are no TypedFields, assume this class hasn't been
         # "TypedField"-ified, so we don't want these to inadvertently return
         # equal.
-        if not var_list:
+        if not self.typed_fields:
             return False
 
-        for f in var_list:
+        for f in self.typed_fields:
             if not f.comparable:
                 continue
             if getattr(self, f.attr_name) != getattr(other, f.attr_name):
