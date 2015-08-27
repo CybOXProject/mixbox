@@ -87,7 +87,7 @@ class Entity(object):
         for f in self.typed_fields:
             if not f.comparable:
                 continue
-            if getattr(self, f.attr_name) != getattr(other, f.attr_name):
+            if f.__get__(self) != f.__get__(other):
                 return False
 
         return True
@@ -185,8 +185,8 @@ class Entity(object):
                     val = [field.type_.from_obj(x) for x in val]
                 else:
                     val = field.type_.from_obj(val)
-            setattr(entity, field.attr_name, val)
 
+            field.__set__(entity, val)
         return entity
 
     @classmethod
@@ -221,7 +221,9 @@ class Entity(object):
             else:
                 if field.multiple and not val:
                     val = []
-            setattr(entity, field.attr_name, val)
+
+            # Set the value
+            field.__set__(entity, val)
 
         return entity
 

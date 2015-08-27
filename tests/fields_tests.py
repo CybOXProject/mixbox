@@ -13,12 +13,10 @@ class TestTypedField(unittest.TestCase):
         a = TypedField("Some_Field", None)
         self.assertEqual("Some_Field", a.name)
         self.assertEqual("some_field", a.key_name)
-        self.assertEqual("some_field", a.attr_name)
 
         a = TypedField("From", None)
         self.assertEqual("From", a.name)
         self.assertEqual("from", a.key_name)
-        self.assertEqual("from_", a.attr_name)
 
 
 if __name__ == "__main__":
