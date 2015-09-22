@@ -20,9 +20,9 @@ def _objectify(value, return_obj, ns_info):
     If `value` is an Entity, call to_obj() on it. Otherwise, return it
     unmodified.
     """
-    if isinstance(value, Entity):
+    try:
         return value.to_obj(return_obj=return_obj, ns_info=ns_info)
-    else:
+    except AttributeError:
         return value
 
 
@@ -32,9 +32,9 @@ def _dictify(value):
     If `value` is an Entity, call to_dict() on it. Otherwise, return it
     unmodified.
     """
-    if isinstance(value, Entity):
+    try:
         return value.to_dict()
-    else:
+    except AttributeError:
         return value
 
 
@@ -190,11 +190,14 @@ class Entity(object):
         return entity
 
     @classmethod
-    def from_dict(cls, cls_dict=None):
+    def from_dict(cls, cls_dict=None, return_obj=None):
         if cls_dict is None:
             return None
 
-        entity = cls()
+        if return_obj is None:
+            entity = cls()
+        else:
+            entity = return_obj
 
         # Shortcut if an actual dict is not provided:
         if not isinstance(cls_dict, dict):
@@ -209,13 +212,13 @@ class Entity(object):
         for field in entity.typed_fields:
             val = cls_dict.get(field.key_name)
             if field.type_:
-                if issubclass(field.type_, EntityList):
-                    val = field.type_.from_list(val)
-                elif field.multiple:
+                if field.multiple:
                     if val is not None:
                         val = [field.type_.from_dict(x) for x in val]
                     else:
                         val = []
+                # elif issubclass(field.type_, entityList):
+                #     val = field.type_.from_list(val)
                 else:
                     val = field.type_.from_dict(val)
             else:
