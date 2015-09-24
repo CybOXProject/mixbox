@@ -8,6 +8,23 @@ Entity field data descriptors (TypedFields) and associated classes.
 from .datautils import is_sequence
 
 
+def unset(entity, *types):
+    """Unset the TypedFields on the input `entity`.
+
+    Args:
+        entity: A mixbox.Entity object.
+        *types: A variable-length list of TypedField subclasses. If not
+            provided, defaults to TypedField.
+    """
+    if not types:
+        types = [TypedField]
+
+    for field in entity.typed_fields:
+        if not isinstance(field, types):
+            continue
+        field.__set__(entity, None)
+
+
 class TypedField(object):
 
     def __init__(self, name, type_=None,

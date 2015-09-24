@@ -217,8 +217,8 @@ class Entity(object):
                         val = [field.type_.from_dict(x) for x in val]
                     else:
                         val = []
-                # elif issubclass(field.type_, entityList):
-                #     val = field.type_.from_list(val)
+                elif issubclass(field.type_, EntityList):
+                    val = field.type_.from_list(val)
                 else:
                     val = field.type_.from_dict(val)
             else:
