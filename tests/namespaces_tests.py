@@ -38,16 +38,16 @@ class TestNamespaceMap(unittest.TestCase):
         self.assertEqual(0, len(nsset))
 
         ns1 = Namespace("http://example.com/", "example", "")
-        nsset.add(ns1)
+        nsset.add_namespace(ns1)
         self.assertEqual(1, len(nsset))
 
         # Adding the same namespace doesn't have an effect
-        nsset.add(ns1)
+        nsset.add_namespace(ns1)
         self.assertEqual(1, len(nsset))
 
         # Neither does adding a new namespace object that is "equal" to the
         # first.
-        nsset.add(Namespace("http://example.com/", "example", ""))
+        nsset.add_namespace(Namespace("http://example.com/", "example", ""))
         self.assertEqual(1, len(nsset))
 
 

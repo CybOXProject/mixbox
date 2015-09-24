@@ -9,7 +9,7 @@ from . import idgen
 from .binding_utils import save_encoding
 from .datautils import is_sequence
 from .fields import TypedField
-from .namespaces import Namespace, lookup_name, lookup_prefix
+from .namespaces import Namespace, lookup_prefix, make_namespace_subset_from_uris
 from .namespaces import get_xmlns_string, get_schemaloc_string
 from .vendor import six
 
@@ -291,29 +291,41 @@ class Entity(object):
         return cls.from_dict(d)
 
     def _get_namespace_def(self, additional_ns_dict=None):
-        # copy necessary namespaces
 
         namespaces = self._get_namespaces()
 
-        if additional_ns_dict:
-            for ns, prefix in six.iteritems(additional_ns_dict):
-                namespaces.update([Namespace(ns, prefix)])
-
-        namespaces.update([idgen._get_generator().namespace])
-
-        # if there are any other namepaces, include xsi for "schemaLocation"
+        # if there are any other namespaces, include xsi for "schemaLocation"
         if namespaces:
-            namespaces.update([lookup_prefix('xsi')])
+            namespaces.add(lookup_prefix('xsi'))
 
-        if not namespaces:
+        # I guess the ID namespace isn't in the global set and always
+        # constitutes a customization.  So our shortcut below to avoid the
+        # subset step when no customizations are necessary, will never be used.
+        # I still want to leave it there though.
+        if additional_ns_dict is None:
+            additional_ns_dict = {}
+        ns = idgen._get_generator().namespace
+        additional_ns_dict[ns.name] = ns.prefix
+
+        if additional_ns_dict:
+            # Create our own subset so as not to disturb the global namespace
+            # set with the caller's customizations.
+            ns_subset = make_namespace_subset_from_uris(namespaces)
+            for ns, prefix in six.iteritems(additional_ns_dict):
+                ns_subset.add_namespace(Namespace(ns, prefix, None))
+
+            xmlns_string = ns_subset.get_xmlns_string(sort=True)
+            schemaloc_string = ns_subset.get_schemaloc_string(sort=True)
+        else:
+            # Avoid creating the subset if no customizations necessary.
+            xmlns_string = get_xmlns_string(namespaces, True)
+            schemaloc_string = get_schemaloc_string(namespaces, True)
+
+        if not xmlns_string and not schemaloc_string:
             return ""
 
-        #TODO: Is there a better `key` to use here?
-        namespaces = sorted(namespaces, key=six.text_type)
-
-        return ('\n\t' + get_xmlns_string(namespaces) +
-                '\n\txsi:schemaLocation="' + get_schemaloc_string(namespaces) +
-                '"')
+        return ('\n\t' + xmlns_string +
+                '\n\t' + schemaloc_string)
 
     def _get_namespaces(self, recurse=True):
         nsset = set()
@@ -322,7 +334,7 @@ class Entity(object):
         namespaces = [x._namespace for x in self.__class__.__mro__
                       if hasattr(x, '_namespace')]
 
-        nsset.update([lookup_name(ns) for ns in namespaces])
+        nsset.update(namespaces)
 
         #In case of recursive relationships, don't process this item twice
         self.touched = True
