@@ -22,7 +22,10 @@ def unset(entity, *types):
     for field in entity.typed_fields:
         if not isinstance(field, types):
             continue
-        field.__set__(entity, None)
+        elif field not in entity._fields:
+            continue
+        else:
+            del entity._fields[field]
 
 
 class TypedField(object):
