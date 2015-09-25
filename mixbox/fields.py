@@ -7,7 +7,7 @@ Entity field data descriptors (TypedFields) and associated classes.
 
 from .datautils import is_sequence
 from .dates import parse_date, parse_datetime
-from .xml import strip_cdata, cdata
+from .xml import strip_cdata
 
 
 def unset(entity, *types):
