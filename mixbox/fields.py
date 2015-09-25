@@ -6,6 +6,7 @@ Entity field data descriptors (TypedFields) and associated classes.
 """
 
 from .datautils import is_sequence
+from .dates import parse_date, parse_datetime
 
 
 def unset(entity, *types):
@@ -127,3 +128,13 @@ class TypedField(object):
             return self._key_name
         else:
             return self.name.lower()
+
+
+class DateTimeField(TypedField):
+    def _clean(self, value):
+        return parse_datetime(value)
+
+
+class DateField(TypedField):
+    def _clean(self, value):
+        return parse_date(value)
