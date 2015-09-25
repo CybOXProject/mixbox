@@ -2,10 +2,11 @@
 # See LICENSE.txt for complete terms.
 
 import collections
+import datetime
 import inspect
 import json
 
-from . import idgen
+from . import idgen, dates
 from .binding_utils import save_encoding
 from .datautils import is_sequence
 from .fields import TypedField
@@ -32,9 +33,13 @@ def _dictify(value):
     If `value` is an Entity, call to_dict() on it. Otherwise, return it
     unmodified.
     """
-    try:
+    if hasattr(value, "to_dict"):
         return value.to_dict()
-    except AttributeError:
+    elif isinstance(value, datetime.datetime):
+        return dates.serialize_datetime(value)
+    elif isinstance(value, datetime.date):
+        return dates.serialize_date(value)
+    else:
         return value
 
 
@@ -202,12 +207,14 @@ class Entity(object):
         # Shortcut if an actual dict is not provided:
         if not isinstance(cls_dict, dict):
             value = cls_dict
-            # Call the class's constructor
+
             try:
-                return cls(value)
-            except TypeError:
-                raise TypeError("Could not instantiate a %s from a %s: %s" %
-                                (cls, type(value), value))
+                return cls(value)   # Call the class's constructor
+            except TypeError as ex:
+                fmt  = "Could not instantiate a %s from a %s: %s"
+                args = (cls, type(value), value)
+                ex.message = fmt % args
+                raise
 
         for field in entity.typed_fields:
             val = cls_dict.get(field.key_name)
