@@ -6,28 +6,30 @@ import datetime
 import inspect
 import json
 
-from . import idgen, dates
+from . import idgen, dates, xml
 from .binding_utils import save_encoding
 from .datautils import is_sequence
-from .fields import TypedField
+from .fields import TypedField, DateTimeField, DateField, CDATAField
 from .namespaces import Namespace, lookup_name, lookup_prefix
 from .namespaces import get_xmlns_string, get_schemaloc_string
 from .vendor import six
 
 
-def _objectify(value, return_obj, ns_info):
+def _objectify(field, value, return_obj, ns_info):
     """Make `value` suitable for a binding object.
 
     If `value` is an Entity, call to_obj() on it. Otherwise, return it
     unmodified.
     """
-    try:
+    if hasattr(value, "to_obj"):
         return value.to_obj(return_obj=return_obj, ns_info=ns_info)
-    except AttributeError:
+    elif isinstance(field, CDATAField):
+        return xml.cdata(value)
+    else:
         return value
 
 
-def _dictify(value):
+def _dictify(field, value):
     """Make `value` suitable for a dictionary.
 
     * If `value` is an Entity, call to_dict() on it.
@@ -36,9 +38,9 @@ def _dictify(value):
     """
     if hasattr(value, "to_dict"):
         return value.to_dict()
-    elif isinstance(value, datetime.datetime):
+    elif isinstance(field, DateTimeField):
         return dates.serialize_datetime(value)
-    elif isinstance(value, datetime.date):
+    elif isinstance(field, DateField):
         return dates.serialize_date(value)
     else:
         return value
@@ -124,11 +126,11 @@ class Entity(object):
         for field, val in six.iteritems(self._fields):
             if field.multiple:
                 if val:
-                    val = [_objectify(x, return_obj, ns_info) for x in val]
+                    val = [_objectify(field, x, return_obj, ns_info) for x in val]
                 else:
                     val = []
             else:
-                val = _objectify(val, return_obj, ns_info)
+                val = _objectify(field, val, return_obj, ns_info)
 
             setattr(entity_obj, field.name, val)
 
@@ -155,11 +157,11 @@ class Entity(object):
         for field, val in six.iteritems(self._fields):
             if field.multiple:
                 if val:
-                    val = [_dictify(x) for x in val]
+                    val = [_dictify(field, x) for x in val]
                 else:
                     val = []
             else:
-                val = _dictify(val)
+                val = _dictify(field, val)
 
             # Only add non-None objects or non-empty lists
             if val is not None and val != []:
