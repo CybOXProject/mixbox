@@ -30,8 +30,9 @@ def _objectify(value, return_obj, ns_info):
 def _dictify(value):
     """Make `value` suitable for a dictionary.
 
-    If `value` is an Entity, call to_dict() on it. Otherwise, return it
-    unmodified.
+    * If `value` is an Entity, call to_dict() on it.
+    * If value is a timestamp, turn it into a string value.
+    * If none of the above are satisfied, return the input value
     """
     if hasattr(value, "to_dict"):
         return value.to_dict()
