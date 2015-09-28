@@ -155,3 +155,25 @@ class CDATAField(TypedField):
     def _clean(self, value):
         return strip_cdata(value)
 
+
+
+class IdField(TypedField):
+    def __set__(self, instance, value):
+        """Set the id field to `value`. If `value` is not None or an empty
+        string, unset the idref fields on `instance`.
+        """
+        super(IdField, self).__set__(instance, value)
+
+        if value:
+            unset(instance, IdrefField)
+
+
+class IdrefField(TypedField):
+    def __set__(self, instance, value):
+        """Set the idref field to `value`. If `value` is not None or an empty
+        string, unset the id fields on `instance`.
+        """
+        super(IdrefField, self).__set__(instance, value)
+
+        if value:
+            unset(instance, IdField)
