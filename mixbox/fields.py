@@ -21,13 +21,11 @@ def unset(entity, *types):
     if not types:
         types = [TypedField]
 
-    for field in entity.typed_fields:
-        if not isinstance(field, types):
-            continue
-        elif field not in entity._fields:
-            continue
-        else:
-            del entity._fields[field]
+    fields = entity._fields.keys()
+    remove = (x for x in fields if isinstance(x, types))
+
+    for field in remove:
+        del entity._fields[field]
 
 
 class TypedField(object):
@@ -70,12 +68,24 @@ class TypedField(object):
         self.postset_hook = postset_hook
 
     def __get__(self, instance, owner=None):
-        # If we are calling this on a class, we want the actual Field, not its
-        # value
+        """Return the TypedField value for the input `instance` and `owner`.
+
+        If the TypedField is a "multiple" field and hasn't been set yet,
+        set the field to an empty list and return it.
+
+        Args:
+            instance: An instance of the `owner` class that this TypedField
+                belongs to..
+            owner: The TypedField owner class.
+        """
         if not instance:
             return self
-
-        return instance._fields.get(self, [] if self.multiple else None)
+        elif self in instance._fields:
+            return instance._fields[self]
+        elif self.multiple:
+            return instance._fields.setdefault(self, [])
+        else:
+            return None
 
     def _clean(self, value):
         """Validate and clean a candidate value for this field."""
@@ -144,3 +154,4 @@ class DateField(TypedField):
 class CDATAField(TypedField):
     def _clean(self, value):
         return strip_cdata(value)
+
