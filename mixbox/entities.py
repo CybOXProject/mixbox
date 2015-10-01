@@ -2,7 +2,6 @@
 # See LICENSE.txt for complete terms.
 
 import collections
-import datetime
 import inspect
 import json
 

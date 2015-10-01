@@ -1,6 +1,5 @@
 # Copyright (c) 2015, The MITRE Corporation. All rights reserved.
 # See LICENSE.txt for complete terms.
-
 """
 Entity field data descriptors (TypedFields) and associated classes.
 """
@@ -35,7 +34,7 @@ def _import_class(classpath):
     """Import the class referred to by the fully qualified class path.
 
     Args:
-        classpath: A full A.B.CLASSNAME package path to a class definition.
+        classpath: A full "A.B.CLASSNAME" package path to a class definition.
 
     Returns:
         The class referred to by the classpath.
@@ -180,6 +179,12 @@ class TypedField(object):
     @type_.setter
     def type_(self, value):
         self._type = value
+
+
+class IntegerField(TypedField):
+    def _clean(self, value):
+        if value is not None:
+            return int(value)
 
 
 class DateTimeField(TypedField):
