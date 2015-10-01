@@ -121,6 +121,7 @@ class Entity(object):
         """
         self._collect_ns_info(ns_info)
 
+        # TODO (bworrell): This should probably be set to return_obj if it isn't None
         entity_obj = self._binding_class()
 
         for field, val in six.iteritems(self._fields):

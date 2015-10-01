@@ -5,6 +5,9 @@
 Entity field data descriptors (TypedFields) and associated classes.
 """
 
+import types
+import importlib
+
 from .datautils import is_sequence
 from .dates import parse_date, parse_datetime
 from .xml import strip_cdata
@@ -28,6 +31,24 @@ def unset(entity, *types):
         del entity._fields[field]
 
 
+def _import_class(classpath):
+    """Import the class referred to by the fully qualified class path.
+
+    Args:
+        classpath: A full A.B.CLASSNAME package path to a class definition.
+
+    Returns:
+        The class referred to by the classpath.
+
+    Raises:
+        ImportError
+    """
+    modname, classname = classpath.rsplit(".", 1)
+    module = importlib.import_module(modname)
+    klass  = vars(module)[classname]
+    return klass
+
+
 class TypedField(object):
 
     def __init__(self, name, type_=None,
@@ -38,8 +59,10 @@ class TypedField(object):
 
         Args:
             `name` (str): name of the field as contained in the binding class.
-            `type_` (type): Required type for values assigned to this field. If
-                `None`, no type checking is performed.
+            `type_` (type/str): Required type for values assigned to this field.
+                If`None`, no type checking is performed. String values are
+                treated as fully qualified package paths to a class (e.g.,
+                "A.B.C" would be the full path to the type "C".)
             `key_name` (str): name for field when represented as a dictionary.
                 (Optional) If omitted, `name.lower()` will be used.
             `comparable` (boolean): whether this field should be considered
@@ -140,6 +163,24 @@ class TypedField(object):
         else:
             return self.name.lower()
 
+    @property
+    def type_(self):
+        if self._type is None:
+            return None
+        elif isinstance(self._type, types.TypeType):
+            return self._type
+        elif isinstance(self._type, basestring):
+            self._type = _import_class(self._type)
+            return self._type
+        else:
+            error = "Unknown TypedField type: '%s' and value: '%s'"
+            error = error % (type(self._type), self._type)
+            raise TypeError(error)
+
+    @type_.setter
+    def type_(self, value):
+        self._type = value
+
 
 class DateTimeField(TypedField):
     def _clean(self, value):
@@ -154,7 +195,6 @@ class DateField(TypedField):
 class CDATAField(TypedField):
     def _clean(self, value):
         return strip_cdata(value)
-
 
 
 class IdField(TypedField):
