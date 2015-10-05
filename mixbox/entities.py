@@ -178,7 +178,7 @@ class Entity(object):
         pass
 
     @classmethod
-    def from_obj(cls, cls_obj=None):
+    def from_obj(cls, cls_obj):
         if not cls_obj:
             return None
 

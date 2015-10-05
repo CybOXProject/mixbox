@@ -90,7 +90,6 @@ class TypedField(object):
         self.multiple = multiple
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
-        self.check_type = getattr(type_, "istypeof", isinstance)
         self.is_type_castable  = getattr(type_, "_try_cast", False)
 
     def __get__(self, instance, owner=None):
@@ -158,6 +157,14 @@ class TypedField(object):
 
     def __str__(self):
         return self.name
+
+    def check_type(self, value):
+        if not self.type_:
+            return
+        elif hasattr(self.type_, "istypeof"):
+            return self.type_.istypeof(value)
+        else:
+            return isinstance(value, self.type_)
 
     @property
     def key_name(self):
