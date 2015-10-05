@@ -90,6 +90,8 @@ class TypedField(object):
         self.multiple = multiple
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
+        self.check_type = getattr(type_, "istypeof", isinstance)
+        self.is_type_castable  = getattr(type_, "_try_cast", False)
 
     def __get__(self, instance, owner=None):
         """Return the TypedField value for the input `instance` and `owner`.
@@ -117,9 +119,9 @@ class TypedField(object):
             return None
         elif self.type_ is None:
             return value
-        elif self.type_.istypeof(value):
+        elif self.check_type(value):
             return value
-        elif self.type_._try_cast:  # noqa
+        elif self.is_type_castable:  # noqa
             return self.type_(value)
 
         error_fmt = "%s must be a %s, not a %s"
