@@ -41,11 +41,12 @@ def _import_class(classpath):
         The class referred to by the classpath.
 
     Raises:
-        ImportError
+        ImportError: If an error occurs while importing the module.
+        KeyError: IF the class does not exist in the imported module.
     """
     modname, classname = classpath.rsplit(".", 1)
     module = importlib.import_module(modname)
-    klass  = vars(module)[classname]
+    klass  = getattr(module, classname)
     return klass
 
 
