@@ -179,11 +179,13 @@ class Entity(object):
         pass
 
     @classmethod
-    def from_obj(cls, cls_obj=None):
+    def from_obj(cls, cls_obj=None, return_obj=None):
         if not cls_obj:
             return None
-
-        entity = cls()
+        elif return_obj is None:
+            entity = cls()
+        else:
+            entity = return_obj
 
         for field in entity.typed_fields:
             val = getattr(cls_obj, field.name)
@@ -198,11 +200,10 @@ class Entity(object):
         return entity
 
     @classmethod
-    def from_dict(cls, cls_dict=None, return_obj=None):
+    def from_dict(cls, cls_dict, return_obj=None):
         if cls_dict is None:
             return None
-
-        if return_obj is None:
+        elif return_obj is None:
             entity = cls()
         else:
             entity = return_obj
@@ -227,8 +228,6 @@ class Entity(object):
                         val = [field.type_.from_dict(x) for x in val]
                     else:
                         val = []
-                elif issubclass(field.type_, EntityList):
-                    val = field.type_.from_list(val)
                 else:
                     val = field.type_.from_dict(val)
             else:
@@ -391,6 +390,10 @@ class EntityList(collections.MutableSequence, Entity):
     # Don't try to cast list types (yet)
     _try_cast = False
 
+    # To use as a key if we want to represent the EntityList as a dictionary.
+    # If None or empty string, to_dict() will return a list.
+    _inner_name = None
+
     def __init__(self, *args):
         super(EntityList, self).__init__()
         self._inner = []
@@ -461,47 +464,66 @@ class EntityList(collections.MutableSequence, Entity):
     # - _binding_class
     # - _binding_var
     # - _contained_type
+    # - _inner_name
 
     def to_obj(self, return_obj=None, ns_info=None):
-        self._collect_ns_info(ns_info)
-
-        tmp_list = [x.to_obj(return_obj=return_obj, ns_info=ns_info) for x in self]
-
-        list_obj = self._binding_class()
-
-        setattr(list_obj, self._binding_var, tmp_list)
-
-        return list_obj
+        obj = super(EntityList, self).to_obj(return_obj=return_obj, ns_info=ns_info)
+        tmplist = [x.to_obj(return_obj=return_obj, ns_info=ns_info) for x in self]
+        setattr(obj, self._binding_var, tmplist)
+        return obj
 
     def to_list(self):
         return [h.to_dict() for h in self]
 
-    # Alias the `to_list` function as `to_dict`
-    to_dict = to_list
+    def to_dict(self):
+        if not self._inner_name:
+            return self.to_list()
+
+        d = super(EntityList, self).to_dict()
+
+        if self._inner:
+            d[self._inner_name] = [x.to_dict() for x in self]
+
+        return d
+
+    @classmethod
+    def from_dict(cls, cls_dict, return_obj=None):
+        if not cls_dict:
+            return None
+
+        if not cls._inner_name:
+            return cls.from_list(cls_dict)
+
+        obj = super(EntityList, cls).from_dict(cls_dict, return_obj)
+
+        if cls._inner_name in cls_dict:
+            obj.extend(cls.from_list(cls_dict[cls._inner_name]))
+
+        return obj
 
     @classmethod
     def from_obj(cls, list_obj):
         if not list_obj:
             return None
 
-        list_ = cls()
+        entitylist = super(EntityList, cls).from_obj(list_obj)
 
         for item in getattr(list_obj, cls._binding_var):
-            list_.append(cls._contained_type.from_obj(item))
+            entitylist.append(cls._contained_type.from_obj(item))
 
-        return list_
+        return entitylist
 
     @classmethod
-    def from_list(cls, list_list):
-        if not isinstance(list_list, list):
+    def from_list(cls, seq):
+        if not seq:
             return None
 
-        list_ = cls()
+        entitylist = cls()
 
-        for item in list_list:
-            list_.append(cls._contained_type.from_dict(item))
+        for item in seq:
+            entitylist.append(cls._contained_type.from_dict(item))
 
-        return list_
+        return entitylist
 
     @classmethod
     def object_from_list(cls, entitylist_list):
