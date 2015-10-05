@@ -160,7 +160,7 @@ class TypedField(object):
 
     def check_type(self, value):
         if not self.type_:
-            return
+            return True
         elif hasattr(self.type_, "istypeof"):
             return self.type_.istypeof(value)
         else:
