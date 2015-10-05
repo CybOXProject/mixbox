@@ -14,14 +14,14 @@ from .namespaces import get_xmlns_string, get_schemaloc_string
 from .vendor import six
 
 
-def _objectify(field, value, return_obj, ns_info):
+def _objectify(field, value, ns_info):
     """Make `value` suitable for a binding object.
 
     If `value` is an Entity, call to_obj() on it. Otherwise, return it
     unmodified.
     """
     if hasattr(value, "to_obj"):
-        return value.to_obj(return_obj=return_obj, ns_info=ns_info)
+        return value.to_obj(ns_info=ns_info)
     elif isinstance(field, CDATAField):
         return xml.cdata(value)
     else:
@@ -109,7 +109,7 @@ class Entity(object):
         ns_info.collect(self)
 
 
-    def to_obj(self, return_obj=None, ns_info=None):
+    def to_obj(self, ns_info=None):
         """Convert to a GenerateDS binding object.
 
         Subclasses can override this function.
@@ -120,17 +120,16 @@ class Entity(object):
         """
         self._collect_ns_info(ns_info)
 
-        # TODO (bworrell): This should probably be set to return_obj if it isn't None
         entity_obj = self._binding_class()
 
         for field, val in six.iteritems(self._fields):
             if field.multiple:
                 if val:
-                    val = [_objectify(field, x, return_obj, ns_info) for x in val]
+                    val = [_objectify(field, x, ns_info) for x in val]
                 else:
                     val = []
             else:
-                val = _objectify(field, val, return_obj, ns_info)
+                val = _objectify(field, val, ns_info)
 
             setattr(entity_obj, field.name, val)
 
@@ -179,13 +178,11 @@ class Entity(object):
         pass
 
     @classmethod
-    def from_obj(cls, cls_obj=None, return_obj=None):
+    def from_obj(cls, cls_obj=None):
         if not cls_obj:
             return None
-        elif return_obj is None:
-            entity = cls()
-        else:
-            entity = return_obj
+
+        entity = cls()
 
         for field in entity.typed_fields:
             val = getattr(cls_obj, field.name)
@@ -200,13 +197,11 @@ class Entity(object):
         return entity
 
     @classmethod
-    def from_dict(cls, cls_dict, return_obj=None):
+    def from_dict(cls, cls_dict):
         if cls_dict is None:
             return None
-        elif return_obj is None:
-            entity = cls()
-        else:
-            entity = return_obj
+
+        entity = cls()
 
         # Shortcut if an actual dict is not provided:
         if not isinstance(cls_dict, dict):
@@ -466,9 +461,9 @@ class EntityList(collections.MutableSequence, Entity):
     # - _contained_type
     # - _inner_name
 
-    def to_obj(self, return_obj=None, ns_info=None):
-        obj = super(EntityList, self).to_obj(return_obj=return_obj, ns_info=ns_info)
-        tmplist = [x.to_obj(return_obj=return_obj, ns_info=ns_info) for x in self]
+    def to_obj(self, ns_info=None):
+        obj = super(EntityList, self).to_obj(ns_info=ns_info)
+        tmplist = [x.to_obj(ns_info=ns_info) for x in self]
         setattr(obj, self._binding_var, tmplist)
         return obj
 
@@ -487,14 +482,14 @@ class EntityList(collections.MutableSequence, Entity):
         return d
 
     @classmethod
-    def from_dict(cls, cls_dict, return_obj=None):
+    def from_dict(cls, cls_dict):
         if not cls_dict:
             return None
 
         if not cls._inner_name:
             return cls.from_list(cls_dict)
 
-        obj = super(EntityList, cls).from_dict(cls_dict, return_obj)
+        obj = super(EntityList, cls).from_dict(cls_dict)
 
         if cls._inner_name in cls_dict:
             obj.extend(cls.from_list(cls_dict[cls._inner_name]))
