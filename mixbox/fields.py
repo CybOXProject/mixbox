@@ -101,7 +101,7 @@ class TypedField(object):
                 belongs to..
             owner: The TypedField owner class.
         """
-        if not instance:
+        if instance is None:
             return self
         elif self in instance._fields:
             return instance._fields[self]
