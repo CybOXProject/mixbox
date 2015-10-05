@@ -10,6 +10,7 @@ import importlib
 from .datautils import is_sequence
 from .dates import parse_date, parse_datetime
 from .xml import strip_cdata
+from .vendor import six
 
 
 def unset(entity, *types):
@@ -179,6 +180,21 @@ class TypedField(object):
     @type_.setter
     def type_(self, value):
         self._type = value
+
+
+class BytesField(TypedField):
+    def _clean(self, value):
+        return six.binary_type(value)
+
+
+class TextField(TypedField):
+    def _clean(self, value):
+        return six.text_type(value)
+
+
+class BooleanField(TypedField):
+    def _clean(self, value):
+        return bool(value)
 
 
 class IntegerField(TypedField):
