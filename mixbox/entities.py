@@ -50,9 +50,14 @@ class EntityFactory(object):
     _objkey    = "xsi_type"
 
     @classmethod
+    def instance(cls, key, *args, **kwargs):
+        klass = cls.entity_class(key)
+        return klass(*args, **kwargs)
+
+    @classmethod
     def entity_class(cls, key):
         """Must be implemented by a subclass."""
-        pass
+        raise NotImplementedError()
 
     @classmethod
     def from_dict(cls, cls_dict):

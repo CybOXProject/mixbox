@@ -84,7 +84,7 @@ class TypedField(object):
                 instance to maintain some type of invariant.
         """
         self.name = name
-        self.type_ = type_
+        self._type = type_
         self._key_name = key_name
         self.comparable = comparable
         self.multiple = multiple
