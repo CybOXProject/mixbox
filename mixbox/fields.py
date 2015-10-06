@@ -50,6 +50,17 @@ def _import_class(classpath):
     return klass
 
 
+def _resolve_class(classref):
+    if classref is None:
+        return None
+    elif isinstance(classref, types.TypeType):
+        return classref
+    elif isinstance(classref, basestring):
+        return _import_class(classref)
+    else:
+        raise ValueError("Unable to resolve class for '%s'" % classref)
+
+
 class TypedField(object):
 
     def __init__(self, name, type_=None,
@@ -91,7 +102,7 @@ class TypedField(object):
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
         self.is_type_castable  = getattr(type_, "_try_cast", False)
-        self.factory = factory
+        self._factory = factory
 
     def __get__(self, instance, owner=None):
         """Return the TypedField value for the input `instance` and `owner`.
@@ -176,21 +187,21 @@ class TypedField(object):
 
     @property
     def type_(self):
-        if self._type is None:
-            return None
-        elif isinstance(self._type, types.TypeType):
-            return self._type
-        elif isinstance(self._type, basestring):
-            self._type = _import_class(self._type)
-            return self._type
-        else:
-            error = "Unknown TypedField type: '%s' and value: '%s'"
-            error = error % (type(self._type), self._type)
-            raise TypeError(error)
+        self._type = _resolve_class(self._type)
+        return self._type
 
     @type_.setter
     def type_(self, value):
         self._type = value
+
+    @property
+    def factory(self):
+        self._factory = _resolve_class(self._factory)
+        return self._factory
+
+    @factory.setter
+    def factory(self, value):
+        self._factory = value
 
     @property
     def transformer(self):
