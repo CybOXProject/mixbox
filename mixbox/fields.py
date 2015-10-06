@@ -54,7 +54,7 @@ class TypedField(object):
 
     def __init__(self, name, type_=None,
                  key_name=None, comparable=True, multiple=False,
-                 preset_hook=None, postset_hook=None):
+                 preset_hook=None, postset_hook=None, factory=None):
         """
         Create a new field.
 
@@ -91,6 +91,7 @@ class TypedField(object):
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
         self.is_type_castable  = getattr(type_, "_try_cast", False)
+        self.factory = factory
 
     def __get__(self, instance, owner=None):
         """Return the TypedField value for the input `instance` and `owner`.
@@ -190,6 +191,25 @@ class TypedField(object):
     @type_.setter
     def type_(self, value):
         self._type = value
+
+    @property
+    def transformer(self):
+        """Return the class for this field that transforms non-Entity objects
+        (e.g., dicts or binding objects) into Entity instances.
+
+        Any non-None value returned from this method should implement a
+        from_obj() and from_dict() method.
+
+        Returns:
+            None if no type_ or factory is defined by the field. Return a class
+            with from_dict and from_obj methods otherwise.
+        """
+        if self.factory:
+            return self.factory
+        elif self.type_:
+            return self.type_
+        else:
+            return None
 
 
 class BytesField(TypedField):

@@ -45,6 +45,34 @@ def _dictify(field, value):
         return value
 
 
+class EntityFactory(object):
+    _dictkey   = "xsi:type"
+    _objkey    = "xsi_type"
+
+    @classmethod
+    def entity_class(cls, key):
+        """Must be implemented by a subclass."""
+        pass
+
+    @classmethod
+    def from_dict(cls, cls_dict):
+        if not cls_dict:
+            return None
+
+        typekey = cls_dict.get(cls._dictkey)
+        klass   = cls.entity_class(typekey)
+        return klass.from_dict(cls_dict)
+
+    @classmethod
+    def from_obj(cls, cls_obj):
+        if not cls_obj:
+            return None
+
+        typekey = getattr(cls_obj, cls._objkey, None)
+        klass   = cls.entity_class(typekey)
+        return klass.from_obj(cls_obj)
+
+
 class Entity(object):
     """Base class for all classes in the Cybox SimpleAPI."""
 
@@ -187,11 +215,11 @@ class Entity(object):
         for field in entity.typed_fields:
             val = getattr(cls_obj, field.name)
 
-            if field.type_:
+            if field.transformer:
                 if field.multiple and val is not None:
-                    val = [field.type_.from_obj(x) for x in val]
+                    val = [field.transformer.from_obj(x) for x in val]
                 else:
-                    val = field.type_.from_obj(val)
+                    val = field.transformer.from_obj(val)
 
             field.__set__(entity, val)
         return entity
@@ -217,14 +245,14 @@ class Entity(object):
 
         for field in entity.typed_fields:
             val = cls_dict.get(field.key_name)
-            if field.type_:
+            if field.transformer:
                 if field.multiple:
                     if val is not None:
-                        val = [field.type_.from_dict(x) for x in val]
+                        val = [field.transformer.from_dict(x) for x in val]
                     else:
                         val = []
                 else:
-                    val = field.type_.from_dict(val)
+                    val = field.transformer.from_dict(val)
             else:
                 if field.multiple and not val:
                     val = []
