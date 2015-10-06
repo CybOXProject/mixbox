@@ -64,8 +64,12 @@ class EntityFactory(object):
         if not cls_dict:
             return None
 
-        typekey = cls_dict.get(cls._dictkey)
-        klass   = cls.entity_class(typekey)
+        if isinstance(cls_dict, dict):
+            typekey = cls_dict.get(cls._dictkey)
+        else:
+            typekey = None
+
+        klass = cls.entity_class(typekey)
         return klass.from_dict(cls_dict)
 
     @classmethod
@@ -414,6 +418,7 @@ class Entity(object):
 
 class EntityList(collections.MutableSequence, Entity):
     _contained_type = object
+    _entity_factory = None
 
     # Don't try to cast list types (yet)
     _try_cast = False
@@ -494,6 +499,12 @@ class EntityList(collections.MutableSequence, Entity):
     # - _contained_type
     # - _inner_name
 
+    @classmethod
+    def _factory(cls):
+        if cls._entity_factory:
+            return cls._entity_factory
+        return cls._contained_type
+
     def to_obj(self, ns_info=None):
         obj = super(EntityList, self).to_obj(ns_info=ns_info)
         tmplist = [x.to_obj(ns_info=ns_info) for x in self]
@@ -534,10 +545,11 @@ class EntityList(collections.MutableSequence, Entity):
         if not list_obj:
             return None
 
+        factory    = cls._factory()
         entitylist = super(EntityList, cls).from_obj(list_obj)
 
         for item in getattr(list_obj, cls._binding_var):
-            entitylist.append(cls._contained_type.from_obj(item))
+            entitylist.append(factory.from_obj(item))
 
         return entitylist
 
@@ -546,10 +558,11 @@ class EntityList(collections.MutableSequence, Entity):
         if not seq:
             return None
 
+        factory    = cls._factory()
         entitylist = cls()
 
         for item in seq:
-            entitylist.append(cls._contained_type.from_dict(item))
+            entitylist.append(factory.from_dict(item))
 
         return entitylist
 
