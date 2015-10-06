@@ -46,13 +46,8 @@ def _dictify(field, value):
 
 
 class EntityFactory(object):
-    _dictkey   = "xsi:type"
-    _objkey    = "xsi_type"
-
-    @classmethod
-    def instance(cls, key, *args, **kwargs):
-        klass = cls.entity_class(key)
-        return klass(*args, **kwargs)
+    _dictkey = "xsi:type"
+    _objkey  = "xsi_type"
 
     @classmethod
     def entity_class(cls, key):
@@ -60,16 +55,28 @@ class EntityFactory(object):
         raise NotImplementedError()
 
     @classmethod
+    def instance(cls, key, *args, **kwargs):
+        klass = cls.entity_class(key)
+        return klass(*args, **kwargs)
+
+
+    @classmethod
+    def objkey(cls, obj):
+        return getattr(obj, cls._objkey, None)
+
+    @classmethod
+    def dictkey(cls, mapping):
+        if isinstance(mapping, dict):
+            return mapping.get(cls._dictkey)
+        return None
+
+    @classmethod
     def from_dict(cls, cls_dict):
         if not cls_dict:
             return None
 
-        if isinstance(cls_dict, dict):
-            typekey = cls_dict.get(cls._dictkey)
-        else:
-            typekey = None
-
-        klass = cls.entity_class(typekey)
+        typekey = cls.dictkey(cls_dict)
+        klass   = cls.entity_class(typekey)
         return klass.from_dict(cls_dict)
 
     @classmethod
@@ -77,7 +84,7 @@ class EntityFactory(object):
         if not cls_obj:
             return None
 
-        typekey = getattr(cls_obj, cls._objkey, None)
+        typekey = cls.objkey(cls_obj)
         klass   = cls.entity_class(typekey)
         return klass.from_obj(cls_obj)
 
