@@ -7,6 +7,8 @@ Utilities for dealing with XML namespaces.
 import collections
 import copy
 
+from mixbox.vendor import six
+
 # A convenience class which represents simplified XML namespace info, consisting
 # of exactly one namespace URI, and an optional prefix and schema location URI.
 # This is handy for building up big tables of namespace data.
@@ -159,6 +161,17 @@ class NamespaceSet(object):
             cloned_ni.preferred_prefix = self.preferred_prefix
             return cloned_ni
 
+        def __eq__(self, other):
+            if self.uri != other.uri:
+                return False
+            if self.prefixes != other.prefixes:
+                return False
+            if self.preferred_prefix != other.preferred_prefix:
+                return False
+            if self.schema_location != other.schema_location:
+                return False
+            return True
+
         def __str__(self):
             "for debugging"
             if self.preferred_prefix:
@@ -237,13 +250,11 @@ class NamespaceSet(object):
 
     def preferred_prefix_for_namespace(self, ns_uri):
         """Get the "preferred" prefix for the given namespace.  Returns None
-        if the preference is to use as the default namespace, or if the given
-        namespace URI doesn't exist in this set.  Use
-        `contains_namespace()` to distinguish the two cases."""
+        if the preference is to use as the default namespace."""
         ni = self.__ns_uri_map.get(ns_uri)
-        if ni:
-            return ni.preferred_prefix
-        return None
+        if ni is None:
+            raise NamespaceNotFoundError(ns_uri)
+        return ni.preferred_prefix
 
     def set_preferred_prefix_for_namespace(self, ns_uri, prefix,
                                            add_if_not_exist=False):
@@ -276,13 +287,6 @@ class NamespaceSet(object):
                     raise PrefixNotFoundError(prefix)
 
             ni.preferred_prefix = prefix
-
-    def prefixes_for_namespace(self, ns_uri):
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni:
-            # Return a copy so users can't mess with the internal set.
-            return set(ni.prefixes)
-        return None
 
     def __merge_schema_locations(self, ni, incoming_schemaloc):
         """Merge incoming_schemaloc into the given `__NamespaceInfo`, ni.  If we
@@ -438,7 +442,7 @@ class NamespaceSet(object):
         """
 
         ni = self.__ns_uri_map.get(ns_uri)
-        if ns_uri is None:
+        if ni is None:
             raise NamespaceNotFoundError(ns_uri)
 
         if replace or ni.schema_location is None:
@@ -474,7 +478,7 @@ class NamespaceSet(object):
         """
 
         if ns_uris is None:
-            ns_uris = self.__ns_uri_map.keys()
+            ns_uris = six.iterkeys(self.__ns_uri_map)
 
         if sort:
             ns_uris = sorted(ns_uris)
@@ -533,7 +537,7 @@ class NamespaceSet(object):
         """
 
         if not ns_uris:
-            ns_uris = self.__ns_uri_map.keys()
+            ns_uris = six.iterkeys(self.__ns_uri_map)
 
         if sort:
             ns_uris = sorted(ns_uris)
@@ -562,7 +566,7 @@ class NamespaceSet(object):
         prefixes.  In the latter situation, if no prefixes are registered,
         an exception is raised."""
         the_map = {}
-        for ni in self.__ns_uri_map.itervalues():
+        for ni in six.itervalues(self.__ns_uri_map):
             if ni.preferred_prefix:
                 the_map[ni.uri] = ni.preferred_prefix
             else:
@@ -584,7 +588,7 @@ class NamespaceSet(object):
         prefixes.  In the latter situation, if no prefixes are registered,
         an exception is raised."""
         the_map = {}
-        for ni in self.__ns_uri_map.itervalues():
+        for ni in six.itervalues(self.__ns_uri_map):
             if ni.preferred_prefix:
                 the_map[ni.preferred_prefix] = ni.uri
             else:
@@ -599,7 +603,7 @@ class NamespaceSet(object):
         """Constructs and returns a map from namespace URI to schema location
         URI.  Namespaces without schema locations are excluded."""
         the_map = {}
-        for ni in self.__ns_uri_map.itervalues():
+        for ni in six.itervalues(self.__ns_uri_map):
             if ni.schema_location:
                 the_map[ni.uri] = ni.schema_location
 
@@ -608,7 +612,7 @@ class NamespaceSet(object):
     @property
     def namespace_uris(self):
         """A generator over the namespace URIs stored in this set."""
-        for uri in self.__ns_uri_map.keys():
+        for uri in six.iterkeys(self.__ns_uri_map):
             yield uri
 
     def subset(self, ns_uris):
@@ -671,18 +675,17 @@ class NamespaceSet(object):
                 self.__add_namespaceinfo(cloned_ni)
             else:
                 if replace:
-
+                    other_ni = other_ns._NamespaceSet__ns_uri_map[other_ns_uri]
                     for other_prefix in other_ni.prefixes:
                         self.__check_prefix_conflict(ni, other_prefix)
 
-                    other_ni = other_ns._NamespaceSet__ns_uri_map[other_ns_uri]
                     cloned_ni = copy.deepcopy(other_ni)
                     self.remove_namespace(other_ns_uri)
                     self.__add_namespaceinfo(cloned_ni)
 
     def is_valid(self):
         "For debugging; does some sanity checks on this set."
-        for ns_uri, ni in self.__ns_uri_map.iteritems():
+        for ns_uri, ni in six.iteritems(self.__ns_uri_map):
             if not ni.uri:
                 return False, "uri not set in namespaceinfo"
             if ns_uri != ni.uri:
@@ -709,9 +712,29 @@ class NamespaceSet(object):
         """Return the number of namespaces in this set."""
         return len(self.__ns_uri_map)
 
+    def __eq__(self, other):
+        """Test two namespaces for equality.  For them to be equal, they must
+        contain the same namespaces, and for each namespace, their prefixes,
+        schema location, and preferred prefix must also be the same."""
+
+        assert isinstance(other, NamespaceSet)
+        if len(other) != len(self):
+            return False
+
+        for ns_uri, ni in six.iteritems(self.__ns_uri_map):
+
+            other_ni = other._NamespaceSet__ns_uri_map.get(ns_uri)
+            if other_ni is None:
+                return False
+
+            if ni != other_ni:
+                return False
+
+        return True
+
     def __str__(self):
         "for debugging"
-        return "\n\n".join(str(v) for v in self.__ns_uri_map.values())
+        return "\n\n".join(str(v) for v in six.itervalues(self.__ns_uri_map))
 
 
 __ALL_NAMESPACES = NamespaceSet()
