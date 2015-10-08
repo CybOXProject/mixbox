@@ -452,6 +452,8 @@ class EntityList(collections.MutableSequence, Entity):
     def __nonzero__(self):
         return bool(self._inner or self._any_typedfields())
 
+    __bool__ = __nonzero__
+
     def __getitem__(self, key):
         return self._inner.__getitem__(key)
 
