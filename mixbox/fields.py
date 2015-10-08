@@ -4,7 +4,6 @@
 Entity field data descriptors (TypedFields) and associated classes.
 """
 
-import types
 import importlib
 
 from .datautils import is_sequence
@@ -53,7 +52,7 @@ def _import_class(classpath):
 def _resolve_class(classref):
     if classref is None:
         return None
-    elif isinstance(classref, types.TypeType):
+    elif isinstance(classref, six.class_types):
         return classref
     elif isinstance(classref, basestring):
         return _import_class(classref)
