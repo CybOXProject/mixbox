@@ -59,7 +59,6 @@ class EntityFactory(object):
         klass = cls.entity_class(key)
         return klass(*args, **kwargs)
 
-
     @classmethod
     def objkey(cls, obj):
         return getattr(obj, cls._objkey, None)
@@ -447,8 +446,11 @@ class EntityList(collections.MutableSequence, Entity):
             else:
                 self.append(arg)
 
+    def _any_typedfields(self):
+        return any(x for x in six.itervalues(self._fields))
+
     def __nonzero__(self):
-        return bool(self._inner)
+        return bool(self._inner or self._any_typedfields())
 
     def __getitem__(self, key):
         return self._inner.__getitem__(key)
