@@ -294,6 +294,42 @@ class Entity(object):
 
         return cls.from_dict(d)
 
+    def _get_namespaces(self, recurse=True):
+        """Only used in a couple places in nose tests now."""
+        nsset = set()
+
+        # Get all _namespaces for parent classes
+        namespaces = [x._namespace for x in self.__class__.__mro__
+                      if hasattr(x, '_namespace')]
+
+        nsset.update(namespaces)
+
+        #In case of recursive relationships, don't process this item twice
+        self.touched = True
+        if recurse:
+            for x in self._get_children():
+                if not hasattr(x, 'touched'):
+                    nsset.update(x._get_namespaces())
+        del self.touched
+
+        return nsset
+
+    def _get_children(self):
+        #TODO: eventually everything should be in _fields, not the top level
+        # of vars()
+
+        members = {}
+        members.update(vars(self))
+        members.update(self._fields)
+
+        for v in six.itervalues(members):
+            if isinstance(v, Entity):
+                yield v
+            elif isinstance(v, list):
+                for item in v:
+                    if isinstance(item, Entity):
+                        yield item
+
     @classmethod
     def istypeof(cls, obj):
         """Check if `cls` is the type of `obj`
