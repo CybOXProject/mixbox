@@ -4,6 +4,8 @@
 import collections
 import inspect
 import json
+import itertools
+import warnings
 
 from . import idgen
 from .binding_utils import save_encoding
@@ -12,7 +14,8 @@ from .fields import TypedField
 from .namespaces import Namespace, lookup_prefix, make_namespace_subset_from_uris
 from .namespaces import get_xmlns_string, get_schemaloc_string
 from .vendor import six
-
+from mixbox import idgen
+import mixbox.namespaces
 
 def _objectify(value, return_obj, ns_info):
     """Make `value` suitable for a binding object.
@@ -253,16 +256,17 @@ class Entity(object):
         """
         namespace_def = ""
 
+        ns_collector = NamespaceCollector()
+        gds_obj = self.to_obj(ns_info=ns_collector if include_namespaces else None)
         if include_namespaces:
-            namespace_def = self._get_namespace_def(namespace_dict)
-
-        if not pretty:
-            namespace_def = namespace_def.replace('\n\t', ' ')
-
+            ns_collector.finalize(namespace_dict)
+            delim = "\n\t" if pretty else " "
+            namespace_def = ns_collector.get_xmlns_string(delim) + delim + \
+                ns_collector.get_schema_location_string(delim)
 
         with save_encoding(encoding):
             sio = six.StringIO()
-            self.to_obj().export(
+            gds_obj.export(
                 sio.write,
                 0,
                 namespacedef_=namespace_def,
@@ -289,78 +293,6 @@ class Entity(object):
             d = json.loads(json_doc)
 
         return cls.from_dict(d)
-
-    def _get_namespace_def(self, additional_ns_dict=None):
-
-        namespaces = self._get_namespaces()
-
-        # if there are any other namespaces, include xsi for "schemaLocation"
-        if namespaces:
-            namespaces.add(lookup_prefix('xsi'))
-
-        # I guess the ID namespace isn't in the global set and always
-        # constitutes a customization.  So our shortcut below to avoid the
-        # subset step when no customizations are necessary, will never be used.
-        # I still want to leave it there though.
-        if additional_ns_dict is None:
-            additional_ns_dict = {}
-        ns = idgen._get_generator().namespace
-        additional_ns_dict[ns.name] = ns.prefix
-
-        if additional_ns_dict:
-            # Create our own subset so as not to disturb the global namespace
-            # set with the caller's customizations.
-            ns_subset = make_namespace_subset_from_uris(namespaces)
-            for ns, prefix in six.iteritems(additional_ns_dict):
-                ns_subset.add_namespace(Namespace(ns, prefix, None))
-
-            xmlns_string = ns_subset.get_xmlns_string(sort=True)
-            schemaloc_string = ns_subset.get_schemaloc_string(sort=True)
-        else:
-            # Avoid creating the subset if no customizations necessary.
-            xmlns_string = get_xmlns_string(namespaces, True)
-            schemaloc_string = get_schemaloc_string(namespaces, True)
-
-        if not xmlns_string and not schemaloc_string:
-            return ""
-
-        return ('\n\t' + xmlns_string +
-                '\n\t' + schemaloc_string)
-
-    def _get_namespaces(self, recurse=True):
-        nsset = set()
-
-        # Get all _namespaces for parent classes
-        namespaces = [x._namespace for x in self.__class__.__mro__
-                      if hasattr(x, '_namespace')]
-
-        nsset.update(namespaces)
-
-        #In case of recursive relationships, don't process this item twice
-        self.touched = True
-        if recurse:
-            for x in self._get_children():
-                if not hasattr(x, 'touched'):
-                    nsset.update(x._get_namespaces())
-        del self.touched
-
-        return nsset
-
-    def _get_children(self):
-        #TODO: eventually everything should be in _fields, not the top level
-        # of vars()
-
-        members = {}
-        members.update(vars(self))
-        members.update(self._fields)
-
-        for v in six.itervalues(members):
-            if isinstance(v, Entity):
-                yield v
-            elif isinstance(v, list):
-                for item in v:
-                    if isinstance(item, Entity):
-                        yield item
 
     @classmethod
     def istypeof(cls, obj):
@@ -511,3 +443,242 @@ class EntityList(collections.MutableSequence, Entity):
     def list_from_object(cls, entitylist_obj):
         """Convert from object representation to list representation."""
         return cls.from_obj(entitylist_obj).to_list()
+
+
+class NamespaceCollector(object):
+
+    def __init__(self):
+        # Namespaces that are "collected" from the Python objects during
+        # serialization.  This will be a NamespaceSet.
+        self._collected_namespaces = None
+
+        # Namespaces and schemalocations that are attached to STIX/CybOX
+        # entities when parsed from an external source.
+        self._input_namespaces = {}
+        self._input_schemalocs = {}
+
+        # A list of classes that have been visited/seen during the namespace
+        # collection process. This speeds up the collect() method.
+        self._collected_classes = set()
+
+        # Namespaces and schemalocations that will appear in the output
+        # XML document.
+        self.finalized_schemalocs = None
+
+        # Namespace dictionary that gets passed to the bindings.
+        self.binding_namespaces = None
+
+    def update(self, ns_info):
+        self._collected_namespaces.update(ns_info._collected_namespaces)  # noqa
+        self._input_namespaces.update(ns_info._input_namespaces)  # noqa
+        self._input_schemalocs.update(ns_info._input_schemalocs)  # noqa
+
+    def _parse_collected_classes(self):
+        collected = self._collected_classes
+
+        # Generator which yields all stix.Entity and mixbox.Entity subclasses
+        # that were collected.
+        entity_subclasses = (
+            klass for klass in collected if issubclass(klass, Entity)
+        )
+
+        alias_to_ns_uri = {}
+        no_alias_ns_uris = []
+        for klass in entity_subclasses:
+            # Prevents exception being raised if/when
+            # collections.MutableSequence or another base class appears in the
+            # MRO.
+            ns = getattr(klass, "_namespace", None)
+            if not ns:
+                continue
+
+            # cybox.objects.* ObjectProperties derivations have an _XSI_NS
+            # class-level attribute which holds the namespace alias to be
+            # used for its namespace.
+            alias = getattr(klass, "_XSI_NS", None)
+            if alias:
+                alias_to_ns_uri[alias] = ns
+                continue
+
+            # Many stix/cybox entity classes have an _XSI_TYPE attribute that
+            # contains a `prefix:namespace` formatted QNAME for the
+            # associated xsi:type.
+            xsi_type = getattr(klass, "_XSI_TYPE", None)
+            if not xsi_type:
+                no_alias_ns_uris.append(ns)
+                continue
+
+            # Attempt to split the xsi:type attribute value into the ns alias
+            # and the typename.
+            typeinfo = xsi_type.split(":")
+            if len(typeinfo) == 2:
+                alias_to_ns_uri[typeinfo[0]] = ns
+            else:
+                no_alias_ns_uris.append(ns)
+
+        # Unrecognized namespace URIs will cause an error at this stage.
+        self._collected_namespaces = mixbox.namespaces.make_namespace_subset_from_uris(
+            itertools.chain(six.itervalues(alias_to_ns_uri), no_alias_ns_uris)
+        )
+
+        # For some reason, prefixes are specified in API class vars and also in
+        # our big namespace tables.  From python-cybox issue #274 [1], I
+        # conclude that the tables may take priority here.  And those are
+        # already going to be preferred at this point.  So the only thing I can
+        # think to do with class var values is fill in any missing prefixes
+        # we may have (but I doubt there will be any).
+        #
+        # 1. https://github.com/CybOXProject/python-cybox/issues/274
+        for prefix, ns_uri in six.iteritems(alias_to_ns_uri):
+            if self._collected_namespaces.preferred_prefix_for_namespace(ns_uri) is None:
+                self._collected_namespaces.set_preferred_prefix_for_namespace(
+                    ns_uri, prefix, True)
+
+    def _fix_example_namespace(self):
+        """Attempts to resolve issues where our samples use
+        'http://example.com/' for our example namespace but python-stix uses
+        'http://example.com' by removing the former.
+
+        """
+        example_prefix = 'example'  # Example ns prefix
+        idgen_prefix = idgen.get_id_namespace_prefix()
+
+        # If the ID namespace alias doesn't match the example alias, return.
+        if idgen_prefix != example_prefix:
+            return
+
+        # If the example namespace prefix isn't in the parsed namespace
+        # prefixes, return.
+        if example_prefix not in self._input_namespaces:
+            return
+
+        self._input_namespaces[example_prefix] = idgen.EXAMPLE_NAMESPACE.name
+
+    def _finalize_namespaces(self, ns_dict=None):
+        """Returns a dictionary of namespaces to be exported with an XML
+        document.
+
+        This loops over all the namespaces that were discovered and built
+        during the execution of ``collect()`` and
+        ``_parse_collected_classes()`` and attempts to merge them all.
+
+        Raises:
+            mixbox.namespaces.DuplicatePrefixError: If namespace prefix was
+                mapped to more than one namespace.
+
+        """
+
+        if ns_dict:
+            # Add the user's entries to our set
+            for ns, alias in six.iteritems(ns_dict):
+                self._collected_namespaces.add_namespace_uri(ns, alias)
+
+        # Add the ID namespaces
+        self._collected_namespaces.add_namespace_uri(
+            idgen.get_id_namespace(),
+            idgen.get_id_namespace_alias()
+        )
+
+        # Remap the example namespace to the one expected by the APIs if the
+        # sample example namespace is found.
+        self._fix_example_namespace()
+
+        # Add _input_namespaces
+        for prefix, uri in six.iteritems(self._input_namespaces):
+            self._collected_namespaces.add_namespace_uri(uri, prefix)
+
+        # Add some default XML namespaces to make sure they're there.
+        self._collected_namespaces.import_from(mixbox.namespaces.XML_NAMESPACES)
+
+        # python-stix's generateDS-generated binding classes can't handle
+        # default namespaces.  So make sure there are no preferred defaults in
+        # the set.  Get prefixes from the global namespace set if we have to.
+        for ns_uri in self._collected_namespaces.namespace_uris:
+            if self._collected_namespaces.preferred_prefix_for_namespace(ns_uri) is None:
+                prefixes = self._collected_namespaces.get_prefixes(ns_uri)
+                if len(prefixes) > 0:
+                    prefix = next(iter(prefixes))
+                else:
+                    prefix = mixbox.namespaces.lookup_name(ns_uri)
+
+                if prefix is None:
+                    raise mixbox.namespaces.NoPrefixesError(ns_uri)
+
+                self._collected_namespaces.set_preferred_prefix_for_namespace(
+                    ns_uri, prefix, True)
+
+    def _finalize_schemalocs(self, schemaloc_dict=None):
+        # If schemaloc_dict was passed in, make a copy so we don't mistakenly
+        # modify the original.
+        if schemaloc_dict:
+            schemaloc_dict = dict(six.iteritems(schemaloc_dict))
+        else:
+            schemaloc_dict = {}
+
+        # Build our schemalocation dictionary!
+        #
+        # Initialize it from values found in the parsed, input schemalocations
+        # (if there are any) and the schemaloc_dict parameter values (if there
+        # are any).
+        #
+        # If there is a schemalocation found in both the parsed schemalocs and
+        # the schema_loc dict, use the schemaloc_dict value.
+        for ns, loc in six.iteritems(self._input_schemalocs):
+            if ns not in schemaloc_dict:
+                schemaloc_dict[ns] = loc
+
+        # Now use the merged dict to update any schema locations we don't
+        # already have.
+        for ns, loc in six.iteritems(schemaloc_dict):
+            if self._collected_namespaces.contains_namespace(ns) and \
+                self._collected_namespaces.get_schema_location(ns) is None:
+                self._collected_namespaces.set_schema_location(ns, loc)
+
+        # Warn if we are missing any schemalocations
+        id_ns = idgen.get_id_namespace()
+        for ns in self._collected_namespaces.namespace_uris:
+            if self._collected_namespaces.get_schema_location(ns) is None:
+                if ns == id_ns or \
+                        mixbox.namespaces.XML_NAMESPACES.contains_namespace(ns) or \
+                        ns in schemaloc_dict:
+                    continue
+
+                error = "Unable to map namespace '{0}' to schemaLocation"
+                warnings.warn(error.format(ns))
+
+    def finalize(self, ns_dict=None, schemaloc_dict=None):
+        self._parse_collected_classes()
+        self._finalize_namespaces(ns_dict)
+        self._finalize_schemalocs(schemaloc_dict)
+
+        self.finalized_schemalocs = \
+            self._collected_namespaces.get_uri_schemaloc_map()
+        self.binding_namespaces = \
+            self._collected_namespaces.get_uri_prefix_map()
+
+    def get_xmlns_string(self, delim):
+        if self._collected_namespaces is None:
+            return ""
+        return self._collected_namespaces.get_xmlns_string(
+            preferred_prefixes_only=False, delim=delim
+        )
+
+    def get_schema_location_string(self, delim):
+        if self._collected_namespaces is None:
+            return ""
+        return self._collected_namespaces.get_schemaloc_string(delim=delim)
+
+    def collect(self, entity):
+        # Collect all the classes we need to inspect for namespace information
+        self._collected_classes.update(entity.__class__.__mro__)
+
+        # Collect the input namespaces if this entity came from some external
+        # source.
+        if hasattr(entity, "__input_namespaces__"):
+            self._input_namespaces.update(entity.__input_namespaces__)
+
+        # Collect the input schemalocation information if this entity came
+        # from some external source.
+        if hasattr(entity, "__input_schemalocations__"):
+            self._input_schemalocs.update(entity.__input_schemalocations__)
+
