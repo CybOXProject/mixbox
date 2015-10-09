@@ -172,6 +172,12 @@ class NamespaceSet(object):
                 return False
             return True
 
+        def __ne__(self, other):
+            """Python2 apparently needs this; python3 has a suitable default
+            which delegates to __eq__.
+            """
+            return not self==other
+
         def __str__(self):
             "for debugging"
             if self.preferred_prefix:
@@ -731,6 +737,12 @@ class NamespaceSet(object):
                 return False
 
         return True
+
+    def __ne__(self, other):
+        """Python2 apparently needs this; python3 has a suitable default
+        which delegates to __eq__.
+        """
+        return not self==other
 
     def __str__(self):
         "for debugging"
