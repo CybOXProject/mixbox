@@ -510,17 +510,9 @@ class NamespaceCollector(object):
         self._input_schemalocs.update(ns_info._input_schemalocs)  # noqa
 
     def _parse_collected_classes(self):
-        collected = self._collected_classes
-
-        # Generator which yields all stix.Entity and mixbox.Entity subclasses
-        # that were collected.
-        entity_subclasses = (
-            klass for klass in collected if issubclass(klass, Entity)
-        )
-
         alias_to_ns_uri = {}
         no_alias_ns_uris = []
-        for klass in entity_subclasses:
+        for klass in self._collected_classes:
             # Prevents exception being raised if/when
             # collections.MutableSequence or another base class appears in the
             # MRO.

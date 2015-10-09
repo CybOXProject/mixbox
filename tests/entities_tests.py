@@ -3,8 +3,10 @@
 
 import unittest
 
-from mixbox.entities import Entity, EntityList
+from mixbox.entities import Entity, EntityList, NamespaceCollector
 from mixbox import fields
+from mixbox.vendor import six
+import mixbox.namespaces
 
 
 class TestEntity(unittest.TestCase):
@@ -72,6 +74,69 @@ class TestEntityList(unittest.TestCase):
                 self.assertFalse(f is Foo("Beta"))
 
         self.assertEqual(2, len(foolist))
+
+
+NSMAP = {
+    "test:a": "a",
+    "test:b": "b",
+    "test:c": "c"
+}
+
+
+SCHEMALOCS = {
+    "test:a": "/dev/null",
+    "test:b": "/dev/null",
+    "test:c": "/dev/null"
+}
+
+
+class A(Entity):
+    _namespace = mixbox.namespaces.NS_XML_SCHEMA.name
+    _XSI_TYPE = "a:AType"
+
+
+class B(A):
+    _namespace = mixbox.namespaces.NS_XML_SCHEMA_INSTANCE.name
+    _XSI_TYPE = "b:BType"
+
+
+class C(B):
+    _namespace = mixbox.namespaces.NS_XLINK.name
+    _XSI_TYPE = "c:CType"
+
+
+class TestNamespaceCollector(unittest.TestCase):
+    def test_nsinfo_collect(self):
+        """Tests that the NamespaceInfo.collect() method correctly ascends the MRO
+        of input objects.
+
+        """
+        nsinfo = NamespaceCollector()
+
+        # Collect classes
+        nsinfo.collect(C())
+
+        # Parse collected classes
+        nsinfo._parse_collected_classes()
+
+        self.assertEqual(len(nsinfo._collected_namespaces), 3)  # noqa
+
+    def test_namespace_collect(self):
+        """Test that NamespaceInfo correctly pulls namespaces from all classes
+        in an objects MRO.
+
+        """
+        nsinfo = NamespaceCollector()
+
+        # Collect classes
+        nsinfo.collect(C())
+
+        # finalize the namespace dictionary
+        nsinfo.finalize(ns_dict=NSMAP, schemaloc_dict=SCHEMALOCS)
+        namespaces = nsinfo.binding_namespaces.keys()
+
+        self.assertTrue(all(ns in namespaces for ns in six.iterkeys(NSMAP)))
+
 
 
 if __name__ == "__main__":
