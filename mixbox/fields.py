@@ -10,6 +10,7 @@ from .datautils import is_sequence
 from .dates import parse_date, parse_datetime
 from .xml import strip_cdata
 from .vendor import six
+from .compat import long
 
 
 def unset(entity, *types):
@@ -239,8 +240,28 @@ class BooleanField(TypedField):
 
 class IntegerField(TypedField):
     def _clean(self, value):
-        if value is not None:
+        if value in (None, ""):
+            return None
+        elif isinstance(value, six.string_types):
+            return int(value, 0)
+        else:
             return int(value)
+
+
+class LongField(TypedField):
+    def _clean(self, value):
+        if value in (None, ""):
+            return None
+        elif isinstance(value, six.string_types):
+            return long(value, 0)
+        else:
+            return long(value)
+
+
+class FloatField(TypedField):
+    def _clean(self, value):
+        if value not in (None, ""):
+            return float(value)
 
 
 class DateTimeField(TypedField):
