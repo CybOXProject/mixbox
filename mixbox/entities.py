@@ -106,14 +106,18 @@ class Entity(object):
         is_field = lambda x: isinstance(x, TypedField)
 
         for name, field in inspect.getmembers(cls, predicate=is_field):
-            yield field
+            yield name, field
 
     @property
     def typed_fields(self):
         """Return a list of this entity's TypedFields."""
+        fields = self.typed_fields_with_attrnames
+        return [field for name, field in fields]
+
+    @property
+    def typed_fields_with_attrnames(self):
         if self._typed_fields is None:
             self._typed_fields = list(self._iter_typed_fields())
-
         return self._typed_fields
 
     def __eq__(self, other):

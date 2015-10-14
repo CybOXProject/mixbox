@@ -5,6 +5,7 @@ Entity field data descriptors (TypedFields) and associated classes.
 """
 
 import importlib
+import inspect
 
 from .datautils import is_sequence
 from .dates import parse_date, parse_datetime
@@ -137,7 +138,7 @@ class TypedField(object):
 
         error_fmt = "%s must be a %s, not a %s"
         error = error_fmt % (self.name, self.type_, type(value))
-        raise ValueError(error)
+        raise TypeError(error)
 
     def __set__(self, instance, value):
         """Sets the field value on `instance` for this TypedField.
