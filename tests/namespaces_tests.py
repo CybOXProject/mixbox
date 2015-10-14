@@ -201,14 +201,21 @@ class TestNamespaceSet(unittest.TestCase):
 
         self.assertTrue(ns.is_valid())
 
-    # For verifying the overall format of the xmlns string.  This matches
-    # the whole thing, and has no captures.
-    XMLNS_RE_NO_CAP = re.compile(r"""^(?:
-                                        xmlns(?::\w+)?    # prefix
-                                        \s*=\s*           # equals
-                                        "[^"]*"\s+        # value
-                                      )*$
-                                  """, re.X)
+    # For verifying the overall format of the xmlns string.  It's in two parts,
+    # 'cause I need to get the inner whitespace separation right.  The basic
+    # format is <re>(\s+<re>)*, where the <re> part is the same regex.  I
+    # didn't want to duplicate the whole thing inside one big regex, so it's
+    # factored out.
+    ONE_XMLNS_RE_NO_CAP = r"""
+                               xmlns(?::\w+)?    # prefix
+                               \s*=\s*           # equals
+                               "[^"]*"           # value
+                           """
+
+    XMLNS_RE_NO_CAP = re.compile(r"^\s*"     + ONE_XMLNS_RE_NO_CAP + """
+                                   (?:\s+""" + ONE_XMLNS_RE_NO_CAP + """
+                                 )*\s*$""",
+                                 re.X)
 
     # For pulling out the individual namespace declarations
     XMLNS_RE = re.compile(r"""
@@ -254,6 +261,18 @@ class TestNamespaceSet(unittest.TestCase):
 
         return dict(zip(uris[::2], uris[1::2]))
 
+    def __namespaceset_equal_uris_and_prefixes(self, ns1, ns2):
+        """I need a NamespaceSet equality check which ignores schema locations
+        and preferred prefixes."""
+        if len(ns1) != len(ns2):
+            return False
+        for ns_uri in ns1.namespace_uris:
+            if not ns2.contains_namespace(ns_uri):
+                return False
+            if ns1.get_prefixes(ns_uri) != ns2.get_prefixes(ns_uri):
+                return False
+        return True
+
     def test_strings(self):
         ns = NamespaceSet()
         ns.add_namespace_uri("a:b:c", "abc", "abcschema")
@@ -261,6 +280,8 @@ class TestNamespaceSet(unittest.TestCase):
         ns.add_namespace_uri("d:e:f", "def", "defschema")
         ns.add_namespace_uri("g:h:i", None)
 
+        # Preferred prefixes only; "abc2" should not be a declared prefix for
+        # a:b:c.
         xmlns_string = ns.get_xmlns_string()
         m = self.XMLNS_RE_NO_CAP.match(xmlns_string)
         self.assertIsNotNone(m, "Invalid XML namespace declaration format")
@@ -280,6 +301,15 @@ class TestNamespaceSet(unittest.TestCase):
         self.assertEqual(ns2.preferred_prefix_for_namespace("d:e:f"), "def")
         self.assertIsNone(ns2.preferred_prefix_for_namespace("g:h:i"))
 
+        # Now, gimme all the prefixes
+        xmlns_string = ns.get_xmlns_string(preferred_prefixes_only=False)
+        m = self.XMLNS_RE_NO_CAP.match(xmlns_string)
+        self.assertIsNotNone(m, "Invalid XML namespace declaration format: " +
+                             xmlns_string)
+
+        ns2 = self.__get_contents_of_xmlns_string(xmlns_string)
+        self.assertTrue(self.__namespaceset_equal_uris_and_prefixes(ns, ns2))
+
         schemaloc_string = ns.get_schemaloc_string()
         m = self.SCHEMALOC_RE_NO_CAP.match(schemaloc_string)
         self.assertIsNotNone(m,
@@ -291,6 +321,12 @@ class TestNamespaceSet(unittest.TestCase):
                              "a:b:c": "abcschema",
                              "d:e:f": "defschema"
                          })
+
+        # Uh oh, another namespace with no prefixes... this NamespaceSet can't
+        # yield an xmlns declaration string anymore.
+        ns.add_namespace_uri("j:k:l", None)
+        self.assertRaises(mixbox.namespaces.TooManyDefaultNamespacesError,
+                          ns.get_xmlns_string)
 
     def test_subset(self):
         ns = NamespaceSet()

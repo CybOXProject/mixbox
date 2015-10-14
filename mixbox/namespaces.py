@@ -271,10 +271,16 @@ class NamespaceSet(object):
         to use the namespace as a default.  The given namespace must already
         be in this set.
 
-        :param str ns_uri: the namespace URI whose prefix is to be set
-        :param str prefix: the preferred prefix to set
-        :param bool add_if_not_exist: Whether to add the prefix if it is not
-           already set as a prefix of `ns_uri`.
+        Args:
+            ns_uri (str): the namespace URI whose prefix is to be set
+            prefix (str): the preferred prefix to set
+            add_if_not_exist (bool): Whether to add the prefix if it is not
+                already set as a prefix of ``ns_uri``.
+
+        Raises:
+            NamespaceNotFoundError: If namespace ``ns_uri`` isn't in this set.
+            DuplicatePrefixError: If ``prefix`` already maps to a different
+                namespace.
         """
 
         ni = self.__ns_uri_map.get(ns_uri)
@@ -307,13 +313,40 @@ class NamespaceSet(object):
                 ni.schema_location = incoming_schemaloc or None
 
     def add_namespace(self, ns):
-        """Add a namespace from a `Namespace` object."""
+        """Add a namespace from a :class:`Namespace` object.  This method
+        just passes off the tuple fields to :meth:`add_namespace_uri`."""
         assert isinstance(ns, Namespace)
         self.add_namespace_uri(ns.name, ns.prefix, ns.schema_location)
 
     def add_namespace_uri(self, ns_uri, prefix=None, schema_location=None):
         """Adds a new namespace to this set, optionally with a prefix and
-        schema location URI."""
+        schema location URI.
+
+        If the namespace already exists, the given prefix and schema location
+        are merged with the existing entry:
+            * If non-None, ``prefix`` is added to the set.  The preferred
+                prefix is not modified.
+            * If a schema location is not already associated with the
+                namespace, it is set to ``schema_location`` (if given).
+
+        If the namespace doesn't already exist in this set (so a new one is
+        being created) and a prefix is given, that prefix becomes preferred.
+        If not given, a preference as a default namespace is used.
+
+        Args:
+            ns_uri (str): The URI of the new namespace
+            prefix (str): The desired prefix for the new namespace (optional)
+            schema_location (str): The desired schema location for the new
+                namespace (optional).
+
+        Raises:
+            DuplicatePrefixError: If a prefix is given which already maps to a
+                different namespace
+            ConflictingSchemaLocationError: If a schema location is given and
+                the namespace already exists in this set with a different
+                schema location.
+
+        """
         assert ns_uri
 
         ni = self.__ns_uri_map.get(ns_uri)
@@ -362,12 +395,21 @@ class NamespaceSet(object):
     def add_prefix(self, ns_uri, prefix, set_as_preferred=False):
         """Adds prefix for the given namespace URI.  The namespace must already
         exist in this set.  If set_as_preferred is True, also set this
-        namespace as the preferred one.  Default is False.
+        namespace as the preferred one.
 
-        :param str ns_uri: The namespace URI to add the prefix to
-        :param str prefix: The prefix to add
-        :param bool set_as_preferred: Whether to set the new prefix as preferred
+        ``prefix`` must be non-None; a default preference can't be set this way.
+        See :meth:`set_preferred_prefix_for_namespace` for that.
+
+        Args:
+            ns_uri (str): The namespace URI to add the prefix to
+            prefix (str): The prefix to add (not None)
+            set_as_preferred (bool): Whether to set the new prefix as preferred
+
+        Raises:
+            NamespaceNotFoundError: If namespace ``ns_uri`` isn't in this set
         """
+        assert prefix
+
         ni = self.__ns_uri_map.get(ns_uri)
         if ni is None:
             raise NamespaceNotFoundError(ns_uri)
@@ -426,13 +468,13 @@ class NamespaceSet(object):
 
         return ni.schema_location
 
-    def set_schema_location(self, ns_uri, schema_location, replace = False):
+    def set_schema_location(self, ns_uri, schema_location, replace=False):
         """Sets the schema location of the given namespace.
 
-        If replace is ``True``, then any existing schema location is replaced.
-        Otherwise, if the schema location is already set to a different value,
-        an exception is raised.  If the schema location is set to None, it is
-        effectively erased from this set (this is not considered
+        If ``replace`` is ``True``, then any existing schema location is
+        replaced.  Otherwise, if the schema location is already set to a
+        different value, an exception is raised.  If the schema location is set
+        to None, it is effectively erased from this set (this is not considered
         "replacement".)
 
         Args:
@@ -460,12 +502,18 @@ class NamespaceSet(object):
             raise ConflictingSchemaLocationError(ns_uri, ni.schema_location,
                                                  schema_location)
 
-    def get_xmlns_string(self, ns_uris = None, sort = False,
-                         preferred_prefixes_only = True, delim = "\n"):
+    def get_xmlns_string(self, ns_uris=None, sort=False,
+                         preferred_prefixes_only=True, delim="\n"):
         """Generates XML namespace declarations for namespaces in this
         set.  It must be suitable for use in an actual XML document,
         so an exception is raised if this can't be done, e.g. if it would
         have more than one default namespace declaration.
+
+        If ``preferred_prefixes_only`` is ``True`` and a namespace's prefix
+        preference is to be a default namespace, a default declaration will
+        be used if possible.  If that's not possible, a prefix will be
+        chosen (is this a good idea?).  If a default declaration can't be used
+        and no other prefixes are defined, an exception is raised.
 
         Args:
             ns_uris (iterable): If non-None, it should be an iterable over
@@ -481,6 +529,15 @@ class NamespaceSet(object):
         Returns:
             str: A string in the following format:
                 ``xmlns:foo="bar"<delim>xmlns:foo2="bar2"<delim>...``
+
+        Raises:
+            NamespaceNotFoundError: If ``ns_uris`` is given and contains any
+                URIs not in this set.
+            TooManyDefaultNamespacesError: If too many namespaces didn't have
+                a prefix.  The algorithm is very simple for deciding whose
+                default preference is honored: the first default preference
+                encountered gets to be default.  Any subsequent namespaces
+                without any prefixes will cause this error.
         """
 
         if ns_uris is None:
@@ -496,12 +553,15 @@ class NamespaceSet(object):
             if not ni:
                 raise NamespaceNotFoundError(ns_uri)
 
-            if preferred_prefixes_only and ni.preferred_prefix is not None:
-                xmlns_str += 'xmlns:{0}="{1}"'.format(ni.preferred_prefix,
-                                                      ni.uri)
+            if preferred_prefixes_only:
+                if ni.preferred_prefix is not None:
+                    xmlns_str += 'xmlns:{0}="{1}"'.format(ni.preferred_prefix,
+                                                          ni.uri)
             else:
-                for prefix in ni.prefixes:
-                    xmlns_str += 'xmlns:{0}="{1}"'.format(prefix, ni.uri)
+                xmlns_str += delim.join(
+                    'xmlns:{0}="'.format(prefix)+ni.uri+'"'
+                        for prefix in ni.prefixes
+                )
 
             if ni.preferred_prefix is None:
                 if have_default:
