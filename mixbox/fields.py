@@ -25,7 +25,7 @@ def unset(entity, *types):
     if not types:
         types = [TypedField]
 
-    fields = entity._fields.keys()
+    fields = list(entity._fields.keys())
     remove = (x for x in fields if isinstance(x, types))
 
     for field in remove:
@@ -56,7 +56,7 @@ def _resolve_class(classref):
         return None
     elif isinstance(classref, six.class_types):
         return classref
-    elif isinstance(classref, basestring):
+    elif isinstance(classref, six.string_types):
         return _import_class(classref)
     else:
         raise ValueError("Unable to resolve class for '%s'" % classref)
