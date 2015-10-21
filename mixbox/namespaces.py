@@ -9,10 +9,20 @@ import copy
 
 from mixbox.vendor import six
 
-# A convenience class which represents simplified XML namespace info, consisting
-# of exactly one namespace URI, and an optional prefix and schema location URI.
-# This is handy for building up big tables of namespace data.
-Namespace = collections.namedtuple("Namespace", "name prefix schema_location")
+_NamespaceTuple = collections.namedtuple("Namespace",
+                                         "name prefix schema_location")
+
+
+class Namespace(_NamespaceTuple):
+    """A convenience class which represents simplified XML namespace info,
+    consisting of exactly one namespace URI, and an optional prefix and schema
+    location URI.  This is handy for building up big tables of namespace data.
+    """
+    def __new__(cls, name, prefix, schema_location=None):
+        """This essentially enables parameter defaulting behavior on a
+        namedtuple.  Here, schema location need not be given when creating a
+        Namespace, and it will default to None."""
+        return super(Namespace, cls).__new__(cls, name, prefix, schema_location)
 
 
 class DuplicatePrefixError(Exception):
