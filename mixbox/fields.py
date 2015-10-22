@@ -223,6 +223,31 @@ class TypedField(object):
         else:
             return None
 
+    def __copy__(self):
+        """See __deepcopy__."""
+        return self
+
+    def __deepcopy__(self, memo):
+        """Return itself (don't actually make a copy at all).
+
+        TypedFields store themselves as a key in an Entity._fields dictionary
+        and use themselves as a key for value retrieval.
+
+        The deecopy() function would normally descend into the _fields dictionary
+        of an Entity and replace the keys with *copies* of the original
+        TypedFields.
+
+        As such, a TypedField would never find itself in a deecopied Entity,
+        because the _fields dictionary had its keys swapped out for copies
+        of the original TypedField.
+
+        We could control __deepcopy__ at the Entity level, but it's a fair
+        amount more complicated and ultimately, we probably never want
+        TypedFields to actually be copied since they are class-level
+        property descriptors.
+        """
+        return self
+
 
 class BytesField(TypedField):
     def _clean(self, value):
