@@ -246,7 +246,9 @@ class TypedField(object):
         TypedFields to actually be copied since they are class-level
         property descriptors.
         """
+        memo[id(self)] = self  # add self to the memo so this isn't called again.
         return self
+
 
 
 class BytesField(TypedField):
