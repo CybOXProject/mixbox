@@ -111,24 +111,20 @@ class _NamespaceInfo(object):
         it.  If one to three strings are passed, they are treated as
         individual namespace components in the following order: URI, prefix,
         schema location.  Either way, the given prefix will become the
-        preferred prefix."""
-        if len(args) == 0:
+        preferred prefix.
+        """
+        iterargs        = iter(args)
+        ns              = next(iterargs, None)
+        prefix          = next(iterargs, None)
+        schema_location = next(iterargs, None)
+
+        if not ns:
             # internal undocumented usage: normal users, don't do this!
             self.__default_construct()
+        elif isinstance(ns, Namespace):
+            self.__construct_from_namespace(ns)
         else:
-            arg0 = args[0]
-            if isinstance(arg0, Namespace):
-                self.__construct_from_namespace(arg0)
-            else:
-                ns_uri = arg0
-                prefix = None
-                schema_location = None
-                if len(args) > 1:
-                    prefix = args[1]
-                if len(args) > 2:
-                    schema_location = args[2]
-                self.__construct_from_components(ns_uri, prefix,
-                                                 schema_location)
+            self.__construct_from_components(ns, prefix, schema_location)
 
     def __default_construct(self):
         """Default-construct this object.
@@ -142,9 +138,8 @@ class _NamespaceInfo(object):
 
     def __construct_from_namespace(self, ns):
         """Initialize this instance from a given Namespace object."""
-        assert isinstance(ns, Namespace)
-        self.__construct_from_components(ns.name, ns.prefix,
-                                         ns.schema_location)
+        assert isinstance(ns, Namespace)  # TODO (bworrell): Change this to an if not isinstance(...): raise TypeError?
+        self.__construct_from_components(ns.name, ns.prefix, ns.schema_location)
 
     def __construct_from_components(self, ns_uri, prefix=None, schema_location=None):
         """Initialize this instance from a namespace URI, and optional
@@ -155,6 +150,7 @@ class _NamespaceInfo(object):
         self.uri = ns_uri
         self.schema_location = schema_location or None
         self.prefixes = set()
+
         if prefix:
             self.prefixes.add(prefix)
         self.preferred_prefix = prefix or None
@@ -172,15 +168,9 @@ class _NamespaceInfo(object):
         return cloned_ni
 
     def __eq__(self, other):
-        if self.uri != other.uri:
+        if type(other) != type(self):
             return False
-        if self.prefixes != other.prefixes:
-            return False
-        if self.preferred_prefix != other.preferred_prefix:
-            return False
-        if self.schema_location != other.schema_location:
-            return False
-        return True
+        return vars(other) == vars(self)
 
     def __ne__(self, other):
         """Python2 apparently needs this; python3 has a suitable default
@@ -259,18 +249,19 @@ class NamespaceSet(object):
 
     def contains_namespace(self, ns_uri):
         """Determines whether the namespace identified by ns_uri is in this
-        set."""
+        set.
+        """
         return ns_uri in self.__ns_uri_map
 
     def namespace_for_prefix(self, prefix):
         """Get the namespace the given prefix maps to.
 
-            Args:
-                prefix (str): The prefix
+        Args:
+            prefix (str): The prefix
 
-            Returns:
-                str: The namespace, or None if the prefix isn't mapped to
-                    anything in this set.
+        Returns:
+            str: The namespace, or None if the prefix isn't mapped to
+                anything in this set.
         """
         ni = self.__prefix_map.get(prefix)
         if ni:
