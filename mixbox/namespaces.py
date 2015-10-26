@@ -155,18 +155,6 @@ class _NamespaceInfo(object):
             self.prefixes.add(prefix)
         self.preferred_prefix = prefix or None
 
-    def __deepcopy__(self, memo):
-        """Custom deep copy implementation for copy.deepcopy()."""
-
-        # the real reason for our undocumented default-construction!
-        cloned_ni = _NamespaceInfo()
-
-        cloned_ni.uri = self.uri
-        cloned_ni.schema_location = self.schema_location
-        cloned_ni.prefixes = self.prefixes.copy()
-        cloned_ni.preferred_prefix = self.preferred_prefix
-        return cloned_ni
-
     def __eq__(self, other):
         if type(other) != type(self):
             return False
