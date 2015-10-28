@@ -5,7 +5,7 @@ import collections
 import inspect
 import json
 
-from . import idgen, dates, xml
+from . import idgen, fields, dates, xml
 from .binding_utils import save_encoding
 from .datautils import is_sequence
 from .fields import TypedField, DateTimeField, DateField, CDATAField
@@ -97,9 +97,13 @@ class Entity(object):
     # False.
     _try_cast = True
 
+    # This gets set once. It would be great if this was set via a metaclass,
+    # but we can't really use them as EntityList extends this and
+    # collections.MutableSequence
+    _typed_fields = None
+
     def __init__(self):
         self._fields = {}
-        self._typed_fields = None
 
     @classmethod
     def _iter_typed_fields(cls):
@@ -112,13 +116,15 @@ class Entity(object):
     def typed_fields(self):
         """Return a list of this entity's TypedFields."""
         fields = self.typed_fields_with_attrnames
-        return [field for name, field in fields]
+        return [field for _, field in fields]
 
     @property
     def typed_fields_with_attrnames(self):
-        if self._typed_fields is None:
-            self._typed_fields = list(self._iter_typed_fields())
-        return self._typed_fields
+        klass = self.__class__
+
+        if klass._typed_fields is None:
+            klass._typed_fields = tuple(self._iter_typed_fields())
+        return list(klass.typed_fields)
 
     def __eq__(self, other):
         # This fixes some strange behavior where an object isn't equal to
@@ -437,9 +443,15 @@ class EntityList(collections.MutableSequence, Entity):
     # If None or empty string, to_dict() will return a list.
     _inner_name = None
 
+
     def __init__(self, *args):
         super(EntityList, self).__init__()
-        self._inner = []
+
+        # Find the only multiple TypedField on this EntityList instance and
+        # store it aside for the MutableSequence methods.
+        multiplefields = fields.find(self, multiple=True)
+        assert len(multiplefields) == 1
+        self._listfield = multiplefields[0]
 
         if not any(args):
             return
@@ -454,57 +466,67 @@ class EntityList(collections.MutableSequence, Entity):
         return any(x for x in six.itervalues(self._fields))
 
     def __nonzero__(self):
-        return bool(self._inner or self._any_typedfields())
+        inner = self._listfield_value()
+        return bool(inner or self._any_typedfields())
 
     __bool__ = __nonzero__
 
     def __getitem__(self, key):
-        return self._inner.__getitem__(key)
+        inner = self._listfield_value()
+        return inner.__getitem__(key)
 
     def __setitem__(self, key, value):
         if not self._is_valid(value):
             value = self._fix_value(value)
-        self._inner.__setitem__(key, value)
+
+        inner = self._listfield_value()
+        inner.__setitem__(key, value)
 
     def __delitem__(self, key):
-        self._inner.__delitem__(key)
+        inner =  self._listfield_value()
+        inner.__delitem__(key)
 
     def __len__(self):
-        return len(self._inner)
+        inner = self._listfield_value()
+        return len(inner)
 
     def insert(self, idx, value):
         if not value:
             return
-        if not self._is_valid(value):
-            value = self._fix_value(value)
-        self._inner.insert(idx, value)
+        # if not self._is_valid(value):
+        #     value = self._fix_value(value)
+        inner = self._listfield_value()
+        inner.insert(idx, value)
 
-    def _is_valid(self, value):
-        """Check if this is a valid object to add to the list.
+    def _listfield_value(self):
+        return self._listfield.__get__(self)
 
-        Subclasses can override this function, but it's probably better to
-        modify the istypeof function on the _contained_type.
-        """
-        return self._contained_type.istypeof(value)
+    # def _is_valid(self, value):
+    #     """Check if this is a valid object to add to the list.
+    #
+    #     Subclasses can override this function, but it's probably better to
+    #     modify the istypeof function on the _contained_type.
+    #     """
+    #     return self._contained_type.istypeof(value)
 
-    def _fix_value(self, value):
-        """Attempt to coerce value into the correct type.
-
-        Subclasses can override this function.
-        """
-        try:
-            new_value = self._contained_type(value)
-        except:
-            error = "Can't put '{0}' ({1}) into a {2}. Expected a {3} object."
-            error = error.format(
-                value,                  # Input value
-                type(value),            # Type of input value
-                type(self),             # Type of collection
-                self._contained_type    # Expected type of input value
-            )
-            raise ValueError(error)
-
-        return new_value
+    # def _fix_value(self, value):
+    #     """Attempt to coerce value into the correct type.
+    #
+    #     Subclasses can override this function.
+    #     """
+    #     try:
+    #         new_value = self._contained_type(value)
+    #     except:
+    #         error = "Can't put '{0}' ({1}) into a {2}. Expected a {3} object."
+    #         error = error.format(
+    #             value,                  # Input value
+    #             type(value),            # Type of input value
+    #             type(self),             # Type of collection
+    #             self._contained_type    # Expected type of input value
+    #         )
+    #         raise ValueError(error)
+    #
+    #     return new_value
 
     # The next four functions can be overridden, but otherwise define the
     # default behavior for EntityList subclasses which define the following
@@ -514,17 +536,12 @@ class EntityList(collections.MutableSequence, Entity):
     # - _contained_type
     # - _inner_name
 
-    @classmethod
-    def _factory(cls):
-        if cls._entity_factory:
-            return cls._entity_factory
-        return cls._contained_type
 
-    def to_obj(self, ns_info=None):
-        obj = super(EntityList, self).to_obj(ns_info=ns_info)
-        tmplist = [x.to_obj(ns_info=ns_info) for x in self]
-        setattr(obj, self._binding_var, tmplist)
-        return obj
+    # def to_obj(self, ns_info=None):
+    #     obj = super(EntityList, self).to_obj(ns_info=ns_info)
+    #     tmplist = [x.to_obj(ns_info=ns_info) for x in self]
+    #     setattr(obj, self._binding_var, tmplist)
+    #     return obj
 
     def to_list(self):
         return [h.to_dict() for h in self]
@@ -533,12 +550,12 @@ class EntityList(collections.MutableSequence, Entity):
         if not self._inner_name:
             return self.to_list()
 
-        d = super(EntityList, self).to_dict()
+        return super(EntityList, self).to_dict()
 
-        if self._inner:
-            d[self._inner_name] = [x.to_dict() for x in self]
-
-        return d
+        # if self._inner:
+        #     d[self._inner_name] = [x.to_dict() for x in self]
+        #
+        # return d
 
     @classmethod
     def from_dict(cls, cls_dict):
@@ -548,36 +565,36 @@ class EntityList(collections.MutableSequence, Entity):
         if not cls._inner_name:
             return cls.from_list(cls_dict)
 
-        obj = super(EntityList, cls).from_dict(cls_dict)
+        return super(EntityList, cls).from_dict(cls_dict)
 
-        if cls._inner_name in cls_dict:
-            obj.extend(cls.from_list(cls_dict[cls._inner_name]))
+        # if cls._inner_name in cls_dict:
+        #     obj.extend(cls.from_list(cls_dict[cls._inner_name]))
+        #
+        # return obj
 
-        return obj
-
-    @classmethod
-    def from_obj(cls, list_obj):
-        if not list_obj:
-            return None
-
-        factory    = cls._factory()
-        entitylist = super(EntityList, cls).from_obj(list_obj)
-
-        for item in getattr(list_obj, cls._binding_var):
-            entitylist.append(factory.from_obj(item))
-
-        return entitylist
+    # @classmethod
+    # def from_obj(cls, list_obj):
+    #     if not list_obj:
+    #         return None
+    #
+    #     factory    = cls._factory()
+    #     entitylist = super(EntityList, cls).from_obj(list_obj)
+    #
+    #     for item in getattr(list_obj, cls._binding_var):
+    #         entitylist.append(factory.from_obj(item))
+    #
+    #     return entitylist
 
     @classmethod
     def from_list(cls, seq):
         if not seq:
             return None
 
-        factory    = cls._factory()
-        entitylist = cls()
+        entitylist     = cls()
+        listfield_type = entitylist._listfield.type_
 
         for item in seq:
-            entitylist.append(factory.from_dict(item))
+            entitylist.append(listfield_type.from_dict(item))
 
         return entitylist
 

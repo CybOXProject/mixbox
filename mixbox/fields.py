@@ -32,6 +32,47 @@ def unset(entity, *types):
         del entity._fields[field]
 
 
+def _matches(field, params):
+    for key, value in six.iteritems(params):
+        if not hasattr(field, key):
+            return False
+        if getattr(field, key) != value:
+            return False
+    return True
+
+
+def find(entity, **kwargs):
+    """Find a TypedField.  The **kwargs are TypedField __init__ kwargs.
+
+    Note:
+        TypedFields.__init__() can accept a string or a class as a type_
+        argument, but this method expects a class.
+
+    Args:
+        **kwargs: TypedField __init__ **kwargs to search on.
+
+    Returns:
+        A list of TypedFields with matching **kwarg values.
+    """
+    if not hasattr(entity, "typed_fields"):
+        return []
+
+    # Some **kwargs get remapped to internal vars.
+    kwargmap = {
+        "factory": "_factory",
+        "key_name": "_key_name"
+    }
+
+    params = {}
+    for param, value in six.iteritems(kwargs):
+        key = kwargmap.get(param, param)
+        params[key] = value
+
+    fields = [x for x in entity.typed_fields if _matches(x, params)]
+
+    return fields
+
+
 def _import_class(classpath):
     """Import the class referred to by the fully qualified class path.
 

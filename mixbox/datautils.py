@@ -9,8 +9,7 @@ from .vendor import six
 
 
 def is_sequence(value):
-    """
-    Determine if a value is a sequence type.
+    """Determine if a value is a sequence type.
 
     Returns:
       ``True`` if `value` is a sequence type (e.g., ``list``, or ``tuple``).
