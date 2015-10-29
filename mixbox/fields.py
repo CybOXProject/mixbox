@@ -3,9 +3,9 @@
 """
 Entity field data descriptors (TypedFields) and associated classes.
 """
-
+import collections
 import importlib
-import inspect
+import functools
 
 from .datautils import is_sequence
 from .dates import parse_date, parse_datetime
@@ -57,7 +57,7 @@ def find(entity, **kwargs):
     if not hasattr(entity, "typed_fields"):
         return []
 
-    # Some **kwargs get remapped to internal vars.
+    # Some **kwargs get remapped to TypedField internal vars.
     kwargmap = {
         "factory": "_factory",
         "key_name": "_key_name"
@@ -103,6 +103,73 @@ def _resolve_class(classref):
         raise ValueError("Unable to resolve class for '%s'" % classref)
 
 
+class _TypedList(collections.MutableSequence):
+    def __init__(self, type, *args):
+        self._inner = []
+        self._type  = type
+
+        for item in args:
+            if is_sequence(item):
+                self.extend(item)
+            else:
+                self.append(item)
+
+    def _is_valid(self, value):
+        if hasattr(self._type, "istypeof"):
+            return self._type.istypeof(value)
+        else:
+            return isinstance(value, self._type)
+
+    def _fix_value(self, value):
+        """Attempt to coerce value into the correct type.
+
+        Subclasses can override this function.
+        """
+        try:
+            new_value = self._type(value)
+        except:
+            error = "Can't put '{0}' ({1}) into a {2}. Expected a {3} object."
+            error = error.format(
+                value,                  # Input value
+                type(value),            # Type of input value
+                type(self),             # Type of collection
+                self._type    # Expected type of input value
+            )
+            raise ValueError(error)
+
+        return new_value
+
+    def __nonzero__(self):
+        return bool(self._inner)
+
+    def __getitem__(self, key):
+        return self._inner.__getitem__(key)
+
+    def __setitem__(self, key, value):
+        if not self._is_valid(value):
+            value = self._fix_value(value)
+        self._inner.__setitem__(key, value)
+
+    def __delitem__(self, key):
+        self._inner.__delitem__(key)
+
+    def __len__(self):
+        return len(self._inner)
+
+    def insert(self, idx, value):
+        if not value:
+            return
+        if not self._is_valid(value):
+            value = self._fix_value(value)
+        self._inner.insert(idx, value)
+
+    def __repr__(self):
+        return self._inner.__repr__()
+
+    def __str__(self):
+        return self._inner.__str__()
+
+
 class TypedField(object):
 
     def __init__(self, name, type_=None,
@@ -145,6 +212,11 @@ class TypedField(object):
         self.postset_hook = postset_hook
         self.is_type_castable  = getattr(type_, "_try_cast", False)
         self._factory = factory
+
+        if type_:
+            self.listclass = functools.partial(_TypedList, type_)
+        else:
+            self.listclass = list
 
     def __get__(self, instance, owner=None):
         """Return the TypedField value for the input `instance` and `owner`.
@@ -193,11 +265,11 @@ class TypedField(object):
         """
         if self.multiple:
             if value is None:
-                value = []
+                value = self.listclass()
             elif not is_sequence(value):
-                value = [self._clean(value)]
+                value = self.listclass([self._clean(value)])
             else:
-                value = [self._clean(x) for x in value if x is not None]
+                value = self.listclass(self._clean(x) for x in value if x is not None)
         else:
             value = self._clean(value)
 
