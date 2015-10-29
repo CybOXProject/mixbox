@@ -236,10 +236,11 @@ class TestNamespaceSet(unittest.TestCase):
         """Converts an xml namespace declaration string to a NamespaceSet."""
         ns = NamespaceSet()
         for m in self.XMLNS_RE.finditer(xmlns_string):
-            pfx = m.group(1)
+            pfx  = m.group(1)
+            uri  = m.group(2)
             if pfx and pfx[0] == ":": # drop leading colons if any
                 pfx = pfx[1:]
-            ns.add_namespace_uri(m.group(2), pfx)
+            ns.add_namespace_uri(uri, pfx)
         return ns
 
     def __get_schema_location_pairs(self, schemaloc_string):
