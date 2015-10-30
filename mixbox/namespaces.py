@@ -6,7 +6,6 @@ Utilities for dealing with XML namespaces.
 
 import collections
 import copy
-import sys
 
 from mixbox.vendor import six
 
