@@ -3,11 +3,11 @@
 """
 Entity field data descriptors (TypedFields) and associated classes.
 """
-import collections
-import importlib
 import functools
+import inspect
 
-from .datautils import is_sequence
+from .datautils import is_sequence, resolve_class
+from .typedlist import TypedList
 from .dates import parse_date, parse_datetime
 from .xml import strip_cdata
 from .vendor import six
@@ -33,16 +33,42 @@ def unset(entity, *types):
 
 
 def _matches(field, params):
-    for key, value in six.iteritems(params):
-        if not hasattr(field, key):
-            return False
-        if getattr(field, key) != value:
-            return False
-    return True
+    """Return True if the input TypedField `field` contains instance attributes
+    that match the input parameters.
+
+    Args:
+        field: A TypedField instance.
+        params: A dictionary of TypedField instance attribute-to-value mappings.
+
+    Returns:
+        True if the input TypedField matches the input parameters.
+    """
+    fieldattrs = list(vars(field).items())
+    tocompare  = six.iteritems(params)
+    return all(x in fieldattrs for x in tocompare)
+
+
+def iterfields(klass):
+    """Iterate over the input class members and yield its TypedFields.
+
+    Args:
+        klass: A class (usually an Entity subclass).
+
+    Yields:
+        Instances of TypedField found on the input class.
+    """
+    is_field = lambda x: isinstance(x, TypedField)
+
+    for name, field in inspect.getmembers(klass, predicate=is_field):
+        yield name, field
 
 
 def find(entity, **kwargs):
-    """Find a TypedField.  The **kwargs are TypedField __init__ kwargs.
+    """Return all TypedFields found on the input `Entity` that were initialized
+    with the input **kwargs.
+
+    Example:
+        >>> find(myentity, multiple=True, type_=Foo)
 
     Note:
         TypedFields.__init__() can accept a string or a class as a type_
@@ -54,120 +80,31 @@ def find(entity, **kwargs):
     Returns:
         A list of TypedFields with matching **kwarg values.
     """
-    if not hasattr(entity, "typed_fields"):
-        return []
+    try:
+        typedfields = entity.typed_fields()
+    except AttributeError:
+        typedfields = list(iterfields(entity.__class__))
 
-    # Some **kwargs get remapped to TypedField internal vars.
+    # TypedField.__init__() renames some input params for use as internal
+    # vars (e.g., "type_" becomes "self._type").
     kwargmap = {
         "factory": "_factory",
         "key_name": "_key_name"
     }
 
+    # Build a dictionary of TypedField attrs-to-values to use as arguments
+    # in our comparison function. This will be used to determine if a
+    # TypedField instance matches our find() criteria.
     params = {}
+
     for param, value in six.iteritems(kwargs):
-        key = kwargmap.get(param, param)
-        params[key] = value
+        if param in kwargmap:
+            param = kwargmap[param]
+        params[param] = value
 
-    fields = [x for x in entity.typed_fields if _matches(x, params)]
+    matching = [x for x in typedfields if _matches(x, params)]
 
-    return fields
-
-
-def _import_class(classpath):
-    """Import the class referred to by the fully qualified class path.
-
-    Args:
-        classpath: A full "A.B.CLASSNAME" package path to a class definition.
-
-    Returns:
-        The class referred to by the classpath.
-
-    Raises:
-        ImportError: If an error occurs while importing the module.
-        AttributeError: IF the class does not exist in the imported module.
-    """
-    modname, classname = classpath.rsplit(".", 1)
-    module = importlib.import_module(modname)
-    klass  = getattr(module, classname)
-    return klass
-
-
-def _resolve_class(classref):
-    if classref is None:
-        return None
-    elif isinstance(classref, six.class_types):
-        return classref
-    elif isinstance(classref, six.string_types):
-        return _import_class(classref)
-    else:
-        raise ValueError("Unable to resolve class for '%s'" % classref)
-
-
-class _TypedList(collections.MutableSequence):
-    def __init__(self, type, *args):
-        self._inner = []
-        self._type  = type
-
-        for item in args:
-            if is_sequence(item):
-                self.extend(item)
-            else:
-                self.append(item)
-
-    def _is_valid(self, value):
-        if hasattr(self._type, "istypeof"):
-            return self._type.istypeof(value)
-        else:
-            return isinstance(value, self._type)
-
-    def _fix_value(self, value):
-        """Attempt to coerce value into the correct type.
-
-        Subclasses can override this function.
-        """
-        try:
-            new_value = self._type(value)
-        except:
-            error = "Can't put '{0}' ({1}) into a {2}. Expected a {3} object."
-            error = error.format(
-                value,                  # Input value
-                type(value),            # Type of input value
-                type(self),             # Type of collection
-                self._type    # Expected type of input value
-            )
-            raise ValueError(error)
-
-        return new_value
-
-    def __nonzero__(self):
-        return bool(self._inner)
-
-    def __getitem__(self, key):
-        return self._inner.__getitem__(key)
-
-    def __setitem__(self, key, value):
-        if not self._is_valid(value):
-            value = self._fix_value(value)
-        self._inner.__setitem__(key, value)
-
-    def __delitem__(self, key):
-        self._inner.__delitem__(key)
-
-    def __len__(self):
-        return len(self._inner)
-
-    def insert(self, idx, value):
-        if not value:
-            return
-        if not self._is_valid(value):
-            value = self._fix_value(value)
-        self._inner.insert(idx, value)
-
-    def __repr__(self):
-        return self._inner.__repr__()
-
-    def __str__(self):
-        return self._inner.__str__()
+    return matching
 
 
 class TypedField(object):
@@ -214,7 +151,7 @@ class TypedField(object):
         self._factory = factory
 
         if type_:
-            self.listclass = functools.partial(_TypedList, type_)
+            self.listclass = functools.partial(TypedList, type_, ignore_none=True)
         else:
             self.listclass = list
 
@@ -234,7 +171,7 @@ class TypedField(object):
         elif self in instance._fields:
             return instance._fields[self]
         elif self.multiple:
-            return instance._fields.setdefault(self, [])
+            return instance._fields.setdefault(self, self.listclass())
         else:
             return None
 
@@ -301,7 +238,7 @@ class TypedField(object):
 
     @property
     def type_(self):
-        self._type = _resolve_class(self._type)
+        self._type = resolve_class(self._type)
         return self._type
 
     @type_.setter
@@ -310,7 +247,7 @@ class TypedField(object):
 
     @property
     def factory(self):
-        self._factory = _resolve_class(self._factory)
+        self._factory = resolve_class(self._factory)
         return self._factory
 
     @factory.setter

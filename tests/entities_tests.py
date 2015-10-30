@@ -54,7 +54,7 @@ class TestEntityList(unittest.TestCase):
                 return self.name
 
         class FooList(EntityList):
-            _contained_type = Foo
+            foos = fields.TypedField("foo", type_=Foo, multiple=True)
 
         foo1 = Foo("Alpha")
         foo2 = Foo("Beta")
