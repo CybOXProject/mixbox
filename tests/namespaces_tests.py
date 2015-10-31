@@ -151,6 +151,14 @@ class TestNamespaceSet(unittest.TestCase):
         ns.set_schema_location("a:b:c", "sc:he:ma2", True)
         self.assertEqual(ns.get_schema_location("a:b:c"), "sc:he:ma2")
 
+        # test schema location merging; these should not raise exceptions
+        ns.add_namespace_uri("a:b:c", "abc", None)
+        self.assertEqual(ns.get_schema_location("a:b:c"), "sc:he:ma2")
+
+        ns.add_namespace_uri("d:e:f", "def", None)
+        ns.add_namespace_uri("d:e:f", "def", "def:schema")
+        self.assertEqual(ns.get_schema_location("d:e:f"), "def:schema")
+
         self.assertTrue(ns.is_valid()[0])
 
     def test_maps(self):
