@@ -4,12 +4,11 @@
 # For license information, see the LICENSE.txt file
 
 from os.path import abspath, dirname, join
-
-
 from setuptools import setup, find_packages
 
 BASE_DIR = dirname(abspath(__file__))
 VERSION_FILE = join(BASE_DIR, 'mixbox', 'version.py')
+
 
 def get_version():
     with open(VERSION_FILE) as f:
@@ -25,18 +24,19 @@ with open('README.rst') as f:
 
 install_requires = ['lxml', 'python-dateutil']
 
-# Python 2.6 doesn't have WeakSet :(
-try:
-    from weakref import WeakSet
-except ImportError:
-    install_requires.append('weakrefset')
+# Some required modules/packages don't exist in all versions of Python.
+# Luckily, backports exist in PyPI.
+backports = {
+    "weakrefmethod": "from weakref import WeakMethod",
+    "importlib": "import importlib",
+    "weakrefset": "from weakref import WeakSet"
+}
 
-
-# WeakMethod was introduced in Python 3.4
-try:
-    from weakref import WeakMethod
-except ImportError:
-    install_requires.append('weakrefmethod')
+for package, importstmt in backports.items():
+    try:
+        exec(importstmt)
+    except ImportError:
+        install_requires.append(package)
 
 
 extras_require = {
