@@ -97,11 +97,6 @@ class Entity(object):
     # False.
     _try_cast = True
 
-    # A tuple of TypedFields defined or inherited by this Entity. This is
-    # lazily set via the typed_fields_with_attrnames classmethod.
-    _typed_fields = None
-
-
     def __init__(self):
         self._fields = {}
 
@@ -116,9 +111,19 @@ class Entity(object):
         """Return a list of (TypedField attribute name, TypedField object)
         tuples for this Entity.
         """
-        if cls._typed_fields is None:
-            cls._typed_fields = tuple(fields.iterfields(cls))
-        return list(cls._typed_fields)
+        # Checking cls._typed_fields could return a superclass _typed_fields
+        # value. So we check our class __dict__ which does not include
+        # inherited attributes.
+        klassdict = cls.__dict__
+
+        try:
+            return klassdict["_typed_fields"]
+        except KeyError:
+            # No typed_fields set on this Entity yet. Find them and store
+            # them in the _typed_fields class attribute.
+            typed_fields = tuple(fields.iterfields(cls))
+            cls._typed_fields = typed_fields
+            return typed_fields
 
     def __eq__(self, other):
         # This fixes some strange behavior where an object isn't equal to
@@ -132,21 +137,15 @@ class Entity(object):
         if self.__class__ != other.__class__:
             return False
 
-        # If there are no TypedFields, assume this class hasn't been
-        # "TypedField"-ified, so we don't want these to inadvertently return
-        # equal.
-        typedfields = self.typed_fields()
+        # Get all comparable TypedFields
+        typedfields = [f for f in self.typed_fields() if f.comparable]
 
+        # If No comparable TypedFields are found, return False so we don't
+        # inadvertantly say they are equal.
         if not typedfields:
             return False
 
-        for f in typedfields:
-            if not f.comparable:
-                continue
-            if f.__get__(self) != f.__get__(other):
-                return False
-
-        return True
+        return all(f.__get__(self) == f.__get__(other) for f in typedfields)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -407,7 +406,7 @@ class Entity(object):
         for v in six.itervalues(members):
             if isinstance(v, Entity):
                 yield v
-            elif isinstance(v, list):
+            elif is_sequence(v):
                 for item in v:
                     if isinstance(item, Entity):
                         yield item
@@ -451,12 +450,7 @@ class EntityList(collections.MutableSequence, Entity):
     # To use as a key if we want to represent the EntityList as a dictionary.
     # If None or empty string, to_dict() will return a list.
     # TODO (bworrell): Remove this. to_dict() should really only ever return a dict or None.
-    _dict_as_list = False
-
-    # The multiple field that is accessed in the MutableSequence methods.
-    # This is set via the `_multiple_field` classproperty which is accessed
-    # in __init__().
-    _entitylist_multifield = None
+    _dict_as_list = True
 
     def __init__(self, *args):
         super(EntityList, self).__init__()
@@ -500,22 +494,37 @@ class EntityList(collections.MutableSequence, Entity):
     def _multiple_field(cls):
         """Return the "multiple" TypedField associated with this EntityList.
 
+        This also lazily sets the ``_entitylist_multiplefield`` value if it
+        hasn't been set yet. This is set to a tuple containing one item because
+        if we set the class attribute to the TypedField, we would effectively
+        add a TypedField descriptor to the class, which we don't want.
+
         Raises:
             AssertionError: If there is more than one multiple TypedField
                 or the the TypedField type_ is not a subclass of Entity.
         """
-        if not cls._entitylist_multifield:
-            multifields = fields.find(cls, multiple=True)
-            assert len(multifields) == 1
+        klassdict = cls.__dict__
+
+        try:
+            # Checking for cls.entitylist_multifield would return any inherited
+            # values, so we check the class __dict__ explicitly.
+            return klassdict["_entitylist_multifield"][0]
+        except (KeyError, IndexError, TypeError):
+            multifield_tuple = tuple(fields.find(cls, multiple=True))
+            assert len(multifield_tuple) == 1
 
             # Make sure that the multiple field actually has an Entity type.
-            multifield  = multifields[0]
+            multifield  = multifield_tuple[0]
             assert issubclass(multifield.type_, Entity)
 
-            # Set the listfield type.
-            cls._entitylist_multifield = multifield
+            # Store aside the multiple field. We wrap it in a tuple because
+            # just doing ``cls._entitylist_multifield = multifield`` would
+            # assign another TypedField descriptor to this class. We don't
+            # want that.
+            cls._entitylist_multifield =  multifield_tuple
 
-        return cls._entitylist_multifield
+            # Return the multiple TypedField
+            return multifield_tuple[0]
 
     @property
     def _inner(self):

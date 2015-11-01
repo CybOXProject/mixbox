@@ -151,7 +151,7 @@ class TypedField(object):
         self._factory = factory
 
         if type_:
-            self.listclass = functools.partial(TypedList, type_, ignore_none=True)
+            self.listclass = functools.partial(TypedList, type_, True)
         else:
             self.listclass = list
 
