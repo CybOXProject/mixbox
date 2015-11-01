@@ -73,7 +73,7 @@ class TypedList(collections.MutableSequence):
         self._inner.__delitem__(key)
 
     def __len__(self):
-        return len(self._inner)
+        return self._inner.__len__()
 
     def insert(self, idx, value):
         if value is None and self._ignore_none:

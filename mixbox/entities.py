@@ -447,10 +447,6 @@ class EntityList(collections.MutableSequence, Entity):
     # Don't try to cast list types (yet)
     _try_cast = False
 
-    # To use as a key if we want to represent the EntityList as a dictionary.
-    # If None or empty string, to_dict() will return a list.
-    # TODO (bworrell): Remove this. to_dict() should really only ever return a dict or None.
-    _dict_as_list = True
 
     def __init__(self, *args):
         super(EntityList, self).__init__()
@@ -483,12 +479,32 @@ class EntityList(collections.MutableSequence, Entity):
         self._inner.__delitem__(key)
 
     def __len__(self):
-        return len(self._inner)
+        return self._inner.__len__()
 
     def insert(self, idx, value):
         if not value:
             return
         self._inner.insert(idx, value)
+
+    @classmethod
+    def _dict_as_list(cls):
+        """Returns True if the to_dict() and from_dict() methods should
+        expect to export/parse lists rather than dicts.
+
+        If there is only one TypedField (a multiple field) defined on the
+        EntityList, this will return True. If there is more than one
+        TypedField, the to_dict() method will export a dict and not a list.
+
+        Note:
+            This can be overridden by subclasses to force this behavior.
+
+        TODO (bworrell):
+            Remove this functionality. The to_dict() method can export a
+            dict, a list, a string/int/etc., or None. This makes parsing
+            complicated. The to_dict() method should probably return a dict
+            and maybe None at most.
+        """
+        return len(cls.typed_fields()) == 1
 
     @classmethod
     def _multiple_field(cls):
@@ -535,7 +551,7 @@ class EntityList(collections.MutableSequence, Entity):
         return [h.to_dict() for h in self]
 
     def to_dict(self):
-        if self._dict_as_list:
+        if self._dict_as_list():
             return self.to_list()
         return super(EntityList, self).to_dict()
 
@@ -544,7 +560,7 @@ class EntityList(collections.MutableSequence, Entity):
         if not cls_dict:
             return None
 
-        if cls._dict_as_list:
+        if cls._dict_as_list():
             return cls.from_list(cls_dict)
 
         return super(EntityList, cls).from_dict(cls_dict)
