@@ -139,6 +139,9 @@ class TypedField(object):
                 same arguments), but is called after setting the value. This
                 can be used, for example, to modify other fields of the
                 instance to maintain some type of invariant.
+            `listfunc` (callable): A datatype or a function that creates a
+                mutable sequence type for multiple field internal storage.
+                E.g., "list".
         """
         self.name = name
         self._type = type_
@@ -152,7 +155,7 @@ class TypedField(object):
         if listfunc:
             self.listfunc = listfunc
         elif type_:
-            self.listfunc = functools.partial(TypedList, type=type_, ignore_none=True)
+            self.listfunc = functools.partial(TypedList, type=type_)
         else:
             self.listfunc = list
 
