@@ -111,7 +111,7 @@ class TypedField(object):
 
     def __init__(self, name, type_=None,
                  key_name=None, comparable=True, multiple=False,
-                 preset_hook=None, postset_hook=None, factory=None):
+                 preset_hook=None, postset_hook=None, factory=None, listfunc=None):
         """
         Create a new field.
 
@@ -147,13 +147,14 @@ class TypedField(object):
         self.multiple = multiple
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
-        self.is_type_castable  = getattr(type_, "_try_cast", False)
         self._factory = factory
 
-        if type_:
-            self.listclass = functools.partial(TypedList, type_, True)
+        if listfunc:
+            self.listfunc = listfunc
+        elif type_:
+            self.listfunc = functools.partial(TypedList, type_, True)
         else:
-            self.listclass = list
+            self.listfunc = list
 
     def __get__(self, instance, owner=None):
         """Return the TypedField value for the input `instance` and `owner`.
@@ -171,7 +172,7 @@ class TypedField(object):
         elif self in instance._fields:
             return instance._fields[self]
         elif self.multiple:
-            return instance._fields.setdefault(self, self.listclass())
+            return instance._fields.setdefault(self, self.listfunc())
         else:
             return None
 
@@ -202,11 +203,11 @@ class TypedField(object):
         """
         if self.multiple:
             if value is None:
-                value = self.listclass()
+                value = self.listfunc()
             elif not is_sequence(value):
-                value = self.listclass([self._clean(value)])
+                value = self.listfunc([self._clean(value)])
             else:
-                value = self.listclass(self._clean(x) for x in value if x is not None)
+                value = self.listfunc(self._clean(x) for x in value if x is not None)
         else:
             value = self._clean(value)
 
@@ -272,6 +273,10 @@ class TypedField(object):
             return self.type_
         else:
             return None
+
+    @property
+    def is_type_castable(self):
+        return getattr(self.type_, "_try_cast", False)
 
 
 class BytesField(TypedField):
