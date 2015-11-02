@@ -57,21 +57,11 @@ def iterfields(klass):
     Yields:
         (class attribute name, TypedField instance) tuples.
     """
-    bases    = inspect.getmro(klass)
-    yielded  = []  # Names of yielded TypedFields. Protects us from inheritance.
+    is_field = lambda x: isinstance(x, TypedField)
 
-    for base in bases:
-        if not hasattr(base, "__dict__"):
-            continue
+    for name, field in inspect.getmembers(klass, predicate=is_field):
+        yield name, field
 
-        for name, attr in six.iteritems(base.__dict__):
-            if not isinstance(attr, TypedField):
-               continue
-            elif name in yielded:
-                continue
-            else:
-                yielded.append(name)
-                yield name, attr
 
 def find(entity, **kwargs):
     """Return all TypedFields found on the input `Entity` that were initialized
