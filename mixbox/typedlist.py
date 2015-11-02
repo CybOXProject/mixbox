@@ -3,7 +3,7 @@
 import collections
 import sys
 
-from .datautils import is_sequence, resolve_class
+from .datautils import is_sequence, resolve_class, needkwargs
 from .entities import EntityList
 from .vendor import six
 
@@ -20,10 +20,11 @@ class TypedList(collections.MutableSequence):
             its contained items will be added.
     """
 
-    def __init__(self, type, ignore_none=True, *args):
-        self._inner = []
-        self._type  = resolve_class(type)
-        self._ignore_none = ignore_none
+    @needkwargs("type")
+    def __init__(self, *args, **kwargs):
+        self._inner       = []
+        self._type        = resolve_class(kwargs["type"])
+        self._ignore_none = kwargs.get("ignore_none", True)
 
         for item in args:
             if isinstance(item, EntityList):

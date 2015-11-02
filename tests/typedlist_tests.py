@@ -7,13 +7,13 @@ from mixbox.typedlist import TypedList
 
 
 class MockType(object):
-           pass
+    pass
 
 
 class TestTypedList(unittest.TestCase):
 
     def test_append_good_type(self):
-        tl = TypedList(MockType)
+        tl = TypedList(type=MockType)
         tl.append(MockType())
 
         self.assertTrue(len(tl) == 1)
@@ -21,9 +21,8 @@ class TestTypedList(unittest.TestCase):
 
 
     def test_append_bad_type(self):
-       tl = TypedList(MockType)
-
-       self.assertRaises(TypeError, tl.append, False)
+        tl = TypedList(type=MockType)
+        self.assertRaises(TypeError, tl.append, False)
 
 
 if __name__ == "__main__":

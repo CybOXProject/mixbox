@@ -78,3 +78,25 @@ class classproperty(object):
 
     def __get__(self, instance, owner):
         return self.getter(owner)
+
+
+def needkwargs(*argnames):
+    """Function decorator which checks that the decorated function is called
+    with a set of required kwargs.
+
+    Args:
+        *argnames: String keyword argument names.
+
+    Raises:
+        ValueError: If a required kwarg is missing in the decorated function
+            call.
+    """
+    def decorator(func):
+        def inner(*args, **kwargs):
+            for name in argnames:
+                if name not in kwargs:
+                    err = "'%s' param is required as a kwarg." % name
+                    raise ValueError(err)
+            return func(*args, **kwargs)
+        return inner
+    return decorator

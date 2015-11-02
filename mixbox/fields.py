@@ -152,7 +152,7 @@ class TypedField(object):
         if listfunc:
             self.listfunc = listfunc
         elif type_:
-            self.listfunc = functools.partial(TypedList, type_, True)
+            self.listfunc = functools.partial(TypedList, type=type_, ignore_none=True)
         else:
             self.listfunc = list
 
