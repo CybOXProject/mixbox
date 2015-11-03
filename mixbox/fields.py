@@ -43,9 +43,8 @@ def _matches(field, params):
     Returns:
         True if the input TypedField matches the input parameters.
     """
-    fieldattrs = list(vars(field).items())
-    tocompare  = six.iteritems(params)
-    return all(x in fieldattrs for x in tocompare)
+    fieldattrs = six.iteritems(params)
+    return all(getattr(field, attr) == val for attr, val in fieldattrs)
 
 
 def iterfields(klass):
@@ -83,27 +82,9 @@ def find(entity, **kwargs):
     try:
         typedfields = entity.typed_fields()
     except AttributeError:
-        typedfields = list(iterfields(entity.__class__))
+        typedfields = iterfields(entity.__class__)
 
-    # TypedField.__init__() renames some input params for use as internal
-    # vars (e.g., "type_" becomes "self._type").
-    kwargmap = {
-        "factory": "_factory",
-        "key_name": "_key_name"
-    }
-
-    # Build a dictionary of TypedField attrs-to-values to use as arguments
-    # in our comparison function. This will be used to determine if a
-    # TypedField instance matches our find() criteria.
-    params = {}
-
-    for param, value in six.iteritems(kwargs):
-        if param in kwargmap:
-            param = kwargmap[param]
-        params[param] = value
-
-    matching = [x for x in typedfields if _matches(x, params)]
-
+    matching = [x for x in typedfields if _matches(x, kwargs)]
     return matching
 
 
@@ -111,7 +92,8 @@ class TypedField(object):
 
     def __init__(self, name, type_=None,
                  key_name=None, comparable=True, multiple=False,
-                 preset_hook=None, postset_hook=None, factory=None, listfunc=None):
+                 preset_hook=None, postset_hook=None, factory=None,
+                 listfunc=None):
         """
         Create a new field.
 
@@ -144,20 +126,33 @@ class TypedField(object):
                 E.g., "list".
         """
         self.name = name
-        self._type = type_
-        self._key_name = key_name
         self.comparable = comparable
         self.multiple = multiple
         self.preset_hook = preset_hook
         self.postset_hook = postset_hook
-        self._factory = factory
 
-        if listfunc:
-            self.listfunc = listfunc
-        elif type_:
-            self.listfunc = functools.partial(TypedList, type=type_)
+        # The type of the field. This is lazily set via the type_ property
+        # at first access.
+        self._unresolved_type = type_
+
+        # The factory for the field. This controls which class will be used
+        # for from_dict() and from_obj() calls for this field.
+        # Lazily set via the factory property.
+        self._unresolved_factory = factory
+
+        # Dictionary key name for the field.
+        if key_name:
+            self._key_name = key_name
         else:
-            self.listfunc = list
+            self._key_name = name.lower()
+
+        # List creation function for multiple fields.
+        if listfunc:
+            self._listfunc = listfunc
+        elif type_:
+            self._listfunc = functools.partial(TypedList, type=type_)
+        else:
+            self._listfunc = list
 
     def __get__(self, instance, owner=None):
         """Return the TypedField value for the input `instance` and `owner`.
@@ -175,7 +170,7 @@ class TypedField(object):
         elif self in instance._fields:
             return instance._fields[self]
         elif self.multiple:
-            return instance._fields.setdefault(self, self.listfunc())
+            return instance._fields.setdefault(self, self._listfunc())
         else:
             return None
 
@@ -206,11 +201,11 @@ class TypedField(object):
         """
         if self.multiple:
             if value is None:
-                value = self.listfunc()
+                value = self._listfunc()
             elif not is_sequence(value):
-                value = self.listfunc([self._clean(value)])
+                value = self._listfunc([self._clean(value)])
             else:
-                value = self.listfunc(self._clean(x) for x in value if x is not None)
+                value = self._listfunc(self._clean(x) for x in value if x is not None)
         else:
             value = self._clean(value)
 
@@ -235,28 +230,31 @@ class TypedField(object):
 
     @property
     def key_name(self):
-        if self._key_name:
-            return self._key_name
-        else:
-            return self.name.lower()
+        return self._key_name
 
     @property
     def type_(self):
-        self._type = resolve_class(self._type)
-        return self._type
+        try:
+            return self._resolved_type
+        except AttributeError:
+            self._resolved_type = resolve_class(self._unresolved_type)
+        return self._resolved_type
 
     @type_.setter
     def type_(self, value):
-        self._type = value
+        self._resolved_type = value
 
     @property
     def factory(self):
-        self._factory = resolve_class(self._factory)
-        return self._factory
+        try:
+            return self._resolved_factory
+        except AttributeError:
+            self._resolved_factory = resolve_class(self._unresolved_factory)
+        return self._resolved_factory
 
     @factory.setter
     def factory(self, value):
-        self._factory = value
+        self._resolved_factory = value
 
     @property
     def transformer(self):
