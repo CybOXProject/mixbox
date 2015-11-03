@@ -343,8 +343,9 @@ class LongField(TypedField):
 
 class FloatField(TypedField):
     def _clean(self, value):
-        if value not in (None, ""):
-            return float(value)
+        if value in (None, ""):
+            return None
+        return float(value)
 
 
 class DateTimeField(TypedField):
