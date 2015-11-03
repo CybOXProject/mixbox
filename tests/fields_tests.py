@@ -64,5 +64,30 @@ class TestTypedField(unittest.TestCase):
         self.assertEqual(entity.foo, None)  # All TypedFields unset
         self.assertEqual(entity.bar, None)  # All TypedFields unset
 
+
+    def test_find(self):
+        class FindEntity(Entity):
+            foo = fields.TypedField("foo")
+            multiple = fields.TypedField("foo", multiple=True)
+            key_name = fields.TypedField("foo", multiple=True, key_name="key")
+
+        entity = FindEntity()
+
+        foos   = fields.find(entity, name="foo")
+        self.assertEqual(len(foos), 3)
+
+        multiples = fields.find(entity, multiple=True)
+        self.assertEqual(len(multiples), 2)
+
+        multiple_foos = fields.find(entity, name="foo", multiple=True)
+        self.assertEqual(len(multiple_foos), 2)
+
+        key_names = fields.find(entity, key_name="key")
+        self.assertEqual(len(key_names), 1)
+
+        miss = fields.find(entity, name="notfound")
+        self.assertEqual(len(miss), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
