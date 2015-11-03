@@ -4,7 +4,7 @@
 import collections
 import json
 
-from . import idgen, dates, xml
+from . import idgen
 from .binding_utils import save_encoding
 from .datautils import is_sequence
 from .namespaces import Namespace, lookup_name, lookup_prefix
@@ -98,9 +98,15 @@ class Entity(object):
 
     @classmethod
     def typed_fields(cls):
-        """Return a list of this entity's TypedFields."""
-        fields = cls.typed_fields_with_attrnames()
-        return [field for _, field in fields]
+        """Return a tuple of this entity's TypedFields."""
+        klassdict = cls.__dict__
+
+        try:
+            return klassdict["_typed_fields"]
+        except KeyError:
+            fields = cls.typed_fields_with_attrnames()
+            cls._typed_fields = tuple(field for _, field in fields)
+        return cls._typed_fields
 
     @classmethod
     def typed_fields_with_attrnames(cls):
@@ -113,12 +119,12 @@ class Entity(object):
         klassdict = cls.__dict__
 
         try:
-            return klassdict["_typed_fields"]
+            return klassdict["_typed_fields_with_attrnames"]
         except KeyError:
             # No typed_fields set on this Entity yet. Find them and store
             # them in the _typed_fields class attribute.
             typed_fields = tuple(fields.iterfields(cls))
-            cls._typed_fields = typed_fields
+            cls._typed_fields_with_attrnames = typed_fields
         return typed_fields
 
     def __eq__(self, other):
@@ -146,10 +152,6 @@ class Entity(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def _collect_ns_info(self, ns_info=None):
-        if ns_info:
-            ns_info.collect(self)
-
     def to_obj(self, ns_info=None):
         """Convert to a GenerateDS binding object.
 
@@ -159,7 +161,8 @@ class Entity(object):
             An instance of this Entity's ``_binding_class`` with properties
             set from this Entity.
         """
-        self._collect_ns_info(ns_info)
+        if ns_info:
+            ns_info.collect(self)
 
         entity_obj = self._binding_class()
 
