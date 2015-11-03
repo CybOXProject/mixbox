@@ -17,15 +17,14 @@ from .vendor import six
 def _objectify(field, value, ns_info):
     """Make `value` suitable for a binding object.
 
-    If `value` is an Entity, call to_obj() on it. Otherwise, return it
-    unmodified.
+    If `value` is an Entity, call to_obj() on it. Otherwise, pass it
+    off to the TypedField for an appropriate value.
     """
-    if hasattr(value, "to_obj"):
+    if value is None:
+        return None
+    elif field.type_:
         return value.to_obj(ns_info=ns_info)
-    elif isinstance(field, fields.CDATAField):
-        return xml.cdata(value)
-    else:
-        return value
+    return field.binding_value(value)
 
 
 def _dictify(field, value):
@@ -35,14 +34,11 @@ def _dictify(field, value):
     * If value is a timestamp, turn it into a string value.
     * If none of the above are satisfied, return the input value
     """
-    if hasattr(value, "to_dict"):
+    if value is None:
+        return None
+    elif field.type_:
         return value.to_dict()
-    elif isinstance(field, fields.DateTimeField):
-        return dates.serialize_datetime(value)
-    elif isinstance(field,fields.DateField):
-        return dates.serialize_date(value)
-    else:
-        return value
+    return field.dict_value(value)
 
 
 class EntityFactory(object):
@@ -123,7 +119,7 @@ class Entity(object):
             # them in the _typed_fields class attribute.
             typed_fields = tuple(fields.iterfields(cls))
             cls._typed_fields = typed_fields
-            return typed_fields
+        return typed_fields
 
     def __eq__(self, other):
         # This fixes some strange behavior where an object isn't equal to

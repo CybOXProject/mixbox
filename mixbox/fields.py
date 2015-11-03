@@ -8,8 +8,8 @@ import inspect
 
 from .datautils import is_sequence, resolve_class
 from .typedlist import TypedList
-from .dates import parse_date, parse_datetime
-from .xml import strip_cdata
+from .dates import parse_date, parse_datetime, serialize_date, serialize_datetime
+from .xml import strip_cdata, cdata
 from .vendor import six
 from .compat import long
 
@@ -279,6 +279,12 @@ class TypedField(object):
     def is_type_castable(self):
         return getattr(self.type_, "_try_cast", False)
 
+    def binding_value(self, value):
+        return value
+
+    def dict_value(self, value):
+        return value
+
     def __copy__(self):
         """See __deepcopy__."""
         return self
@@ -352,15 +358,24 @@ class DateTimeField(TypedField):
     def _clean(self, value):
         return parse_datetime(value)
 
+    def dict_value(self, value):
+        return serialize_datetime(value)
+
 
 class DateField(TypedField):
     def _clean(self, value):
         return parse_date(value)
 
+    def dict_value(self, value):
+        return serialize_date(value)
+
 
 class CDATAField(TypedField):
     def _clean(self, value):
         return strip_cdata(value)
+
+    def binding_value(self, value):
+        return cdata(value)
 
 
 class IdField(TypedField):
