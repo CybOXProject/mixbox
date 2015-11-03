@@ -33,7 +33,6 @@ class TestTypedField(unittest.TestCase):
     def test_iterfields(self):
         entity_fields     = list(fields.iterfields(MockEntity))
 
-
         entitylist = MockEntityList()
         entitylist_fields = list(fields.iterfields(MockEntityList))
 
@@ -41,7 +40,29 @@ class TestTypedField(unittest.TestCase):
         self.assertEqual(2, len(entitylist_fields))
 
 
+    def test_unset(self):
+        class UnsetField(fields.TypedField):
+            pass
 
+        class TestEntity(Entity):
+            foo = UnsetField("foo")
+            bar = fields.TypedField("bar")
+
+
+        entity = TestEntity()
+        entity.foo = "test"
+        entity.bar = "test"
+
+        self.assertEqual(entity.foo, "test")
+        self.assertEqual(entity.bar, "test")
+
+        fields.unset(entity, UnsetField)
+        self.assertEqual(entity.foo, None)    # UnsetField has been unset
+        self.assertEqual(entity.bar, "test")  # TypedField wasn't touched
+
+        fields.unset(entity)
+        self.assertEqual(entity.foo, None)  # All TypedFields unset
+        self.assertEqual(entity.bar, None)  # All TypedFields unset
 
 if __name__ == "__main__":
     unittest.main()

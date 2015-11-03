@@ -23,7 +23,7 @@ def unset(entity, *types):
             provided, defaults to TypedField.
     """
     if not types:
-        types = [TypedField]
+        types = (TypedField,)
 
     fields = list(entity._fields.keys())
     remove = (x for x in fields if isinstance(x, types))
