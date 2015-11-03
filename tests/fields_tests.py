@@ -33,6 +33,9 @@ class TestTypedField(unittest.TestCase):
     def test_iterfields(self):
         entity_fields     = list(fields.iterfields(MockEntity))
 
+        # Create an instance of MockEntityList because there had been a
+        # bug where the number of typed_fields reported in iterfields()
+        # grew each time we created an instance of the Entity.
         entitylist = MockEntityList()
         entitylist_fields = list(fields.iterfields(MockEntityList))
 
