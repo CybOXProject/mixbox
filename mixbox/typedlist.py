@@ -15,6 +15,8 @@ class TypedList(collections.MutableSequence):
     Args:
         type: The type of the items contained in this collection.
         ignore_none: If True, do not insert None values.
+        castfunc: A callable that will convert non-valid items into
+            valid items.
         *args: A variable-length list of items to add to the collection.
             If an arg is a non-string, non-EntityList iterable type, each of
             its contained items will be added.
@@ -24,6 +26,7 @@ class TypedList(collections.MutableSequence):
     def __init__(self, *args, **kwargs):
         self._inner       = []
         self._type        = resolve_class(kwargs["type"])
+        self._castfunc    = kwargs.get("castfunc", self._type)
         self._ignore_none = kwargs.get("ignore_none", True)
 
         for item in args:
@@ -35,6 +38,15 @@ class TypedList(collections.MutableSequence):
                 self.append(item)
 
     def _is_valid(self, value):
+        """Return True if the input value is valid for insertion into the
+        inner list.
+
+        Args:
+            value: An object about to be inserted.
+        """
+
+        # Entities have an istypeof method that can perform more sophisticated
+        # type checking.
         if hasattr(self._type, "istypeof"):
             return self._type.istypeof(value)
         else:
@@ -46,7 +58,7 @@ class TypedList(collections.MutableSequence):
         Subclasses can override this function.
         """
         try:
-            new_value = self._type(value)
+            return self._castfunc(value)
         except:
             error = "Can't put '{0}' ({1}) into a {2}. Expected a {3} object."
             error = error.format(
@@ -57,8 +69,6 @@ class TypedList(collections.MutableSequence):
             )
             six.reraise(TypeError, TypeError(error), sys.exc_info()[-1])
 
-        return new_value
-
     def __nonzero__(self):
         return bool(self._inner)
 
@@ -66,6 +76,15 @@ class TypedList(collections.MutableSequence):
         return self._inner.__getitem__(key)
 
     def __setitem__(self, key, value):
+        """Attempt to set the value at position `key` to the `value`.
+
+        If a value is not the correct type, an attempt will be made to
+        convert it to the correct type.
+
+        Args:
+            key: An index.
+            value: A value to set.
+        """
         if not self._is_valid(value):
             value = self._fix_value(value)
         self._inner.__setitem__(key, value)
