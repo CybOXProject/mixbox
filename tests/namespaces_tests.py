@@ -76,8 +76,15 @@ class TestNamespaceSet(unittest.TestCase):
         # Make sure prefix_iter() gives the same prefixes as get_prefixes().
         self.assertEqual(len(ns.get_prefixes("a:b:c")),
                          len(list(ns.prefix_iter("a:b:c"))))
-        self.assertTrue(all(map(operator.eq, ns.get_prefixes("a:b:c"),
-                                ns.prefix_iter("a:b:c"))))
+        #self.assertTrue(all(map(operator.eq, ns.get_prefixes("a:b:c"),
+        #                        ns.prefix_iter("a:b:c"))))
+        # One time, I saw the above test code fail.  I never saw it again.
+        # Seems like the prefixes may have come out in a different order or
+        # something... guess I'll play it safe and copy them to sorted
+        # lists before comparing.
+        pfxs1 = sorted(ns.get_prefixes("a:b:c"))
+        pfxs2 = sorted(ns.prefix_iter("a:b:c"))
+        self.assertTrue(all(map(operator.eq, pfxs1, pfxs2)))
 
         self.assertEqual(ns.namespace_for_prefix("pfx"), "a:b:c")
         self.assertEqual(ns.namespace_for_prefix("pfx2"), "a:b:c")
