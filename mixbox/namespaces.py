@@ -317,6 +317,8 @@ class NamespaceSet(object):
             return
         elif not ni.schema_location:
             ni.schema_location = incoming_schemaloc or None
+        elif not incoming_schemaloc:
+            return
         else:
             raise ConflictingSchemaLocationError(ni.uri, ni.schema_location, incoming_schemaloc)
 
