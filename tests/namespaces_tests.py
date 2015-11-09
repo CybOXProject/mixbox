@@ -242,8 +242,9 @@ class TestNamespaceSet(unittest.TestCase):
     # For verifying the overall format of the schemalocation string.  This
     # matches the whole thing, and has no captures.
     SCHEMALOC_RE_NO_CAP = re.compile(r"""
-                                         ^xsi:schemaLocation="\s*
-                                         (?:\S+\s+\S+)*   # ns/schemaloc pairs
+                                         ^xsi:schemaLocation\s*=\s*"\s*
+                                         (?:\S+\s+\S+)       # first ns/loc pair
+                                         (?:\s+\S+\s+\S+)*   # rest of ns/loc pairs
                                          \s*"$
                                       """, re.X)
 
