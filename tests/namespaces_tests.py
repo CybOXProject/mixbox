@@ -310,8 +310,8 @@ class TestNamespaceSet(unittest.TestCase):
         self.assertTrue(ns2.contains_namespace("d:e:f"))
         self.assertTrue(ns2.contains_namespace("g:h:i"))
 
-        self.assertEqual(ns2.get_prefixes("a:b:c"), set(("abc",)))
-        self.assertEqual(ns2.get_prefixes("d:e:f"), set(("def",)))
+        self.assertEqual(ns2.get_prefixes("a:b:c"), {"abc"})
+        self.assertEqual(ns2.get_prefixes("d:e:f"), {"def"})
         self.assertEqual(len(ns2.get_prefixes("g:h:i")), 0)
 
         self.assertEqual(ns2.preferred_prefix_for_namespace("a:b:c"), "abc")
@@ -376,7 +376,7 @@ class TestNamespaceSet(unittest.TestCase):
         # entry with (a copy of) imported_ns2's entry.
         ns.import_from(imported_ns2, True)
 
-        self.assertEqual(ns.get_prefixes("a:b:c"), set(("abc2",)))
+        self.assertEqual(ns.get_prefixes("a:b:c"), {"abc2"})
         self.assertIsNone(ns.get_schema_location("a:b:c"))
 
         imported_ns3 = NamespaceSet()
