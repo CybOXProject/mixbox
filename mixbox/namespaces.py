@@ -12,7 +12,6 @@ from mixbox.vendor import six
 _NamespaceTuple = collections.namedtuple("Namespace",
                                          "name prefix schema_location")
 
-
 class Namespace(_NamespaceTuple):
     """A convenience class which represents simplified XML namespace info,
     consisting of exactly one namespace URI, and an optional prefix and schema
@@ -111,24 +110,19 @@ class _NamespaceInfo(object):
         it.  If one to three strings are passed, they are treated as
         individual namespace components in the following order: URI, prefix,
         schema location.  Either way, the given prefix will become the
-        preferred prefix."""
-        if len(args) == 0:
-            # internal undocumented usage: normal users, don't do this!
+        preferred prefix.
+        """
+        iterargs = iter(args)
+        ns       = next(iterargs, None)
+
+        if not args:
             self.__default_construct()
+        elif isinstance(ns, Namespace):
+            self.__construct_from_namespace(ns)
         else:
-            arg0 = args[0]
-            if isinstance(arg0, Namespace):
-                self.__construct_from_namespace(arg0)
-            else:
-                ns_uri = arg0
-                prefix = None
-                schema_location = None
-                if len(args) > 1:
-                    prefix = args[1]
-                if len(args) > 2:
-                    schema_location = args[2]
-                self.__construct_from_components(ns_uri, prefix,
-                                                 schema_location)
+            prefix    = next(iterargs, None)
+            schemaloc = next(iterargs, None)
+            self.__construct_from_components(ns, prefix, schemaloc)
 
     def __default_construct(self):
         """Default-construct this object.
@@ -142,9 +136,8 @@ class _NamespaceInfo(object):
 
     def __construct_from_namespace(self, ns):
         """Initialize this instance from a given Namespace object."""
-        assert isinstance(ns, Namespace)
-        self.__construct_from_components(ns.name, ns.prefix,
-                                         ns.schema_location)
+        assert isinstance(ns, Namespace)  # TODO (bworrell): Change this to an if not isinstance(...): raise TypeError?
+        self.__construct_from_components(*ns)
 
     def __construct_from_components(self, ns_uri, prefix=None, schema_location=None):
         """Initialize this instance from a namespace URI, and optional
@@ -155,38 +148,21 @@ class _NamespaceInfo(object):
         self.uri = ns_uri
         self.schema_location = schema_location or None
         self.prefixes = set()
+
         if prefix:
             self.prefixes.add(prefix)
         self.preferred_prefix = prefix or None
 
-    def __deepcopy__(self, memo):
-        """Custom deep copy implementation for copy.deepcopy()."""
-
-        # the real reason for our undocumented default-construction!
-        cloned_ni = _NamespaceInfo()
-
-        cloned_ni.uri = self.uri
-        cloned_ni.schema_location = self.schema_location
-        cloned_ni.prefixes = self.prefixes.copy()
-        cloned_ni.preferred_prefix = self.preferred_prefix
-        return cloned_ni
-
     def __eq__(self, other):
-        if self.uri != other.uri:
+        if type(other) != type(self):
             return False
-        if self.prefixes != other.prefixes:
-            return False
-        if self.preferred_prefix != other.preferred_prefix:
-            return False
-        if self.schema_location != other.schema_location:
-            return False
-        return True
+        return vars(other) == vars(self)
 
     def __ne__(self, other):
         """Python2 apparently needs this; python3 has a suitable default
         which delegates to __eq__.
         """
-        return not self == other
+        return not self.__eq__(other)
 
     def __str__(self):
         """for debugging"""
@@ -194,9 +170,9 @@ class _NamespaceInfo(object):
             preferred_prefix = self.preferred_prefix
         else:
             preferred_prefix = "(default)"
-        return "\n  ".join((self.uri, str(self.prefixes),
-                            "preferred: " + preferred_prefix,
-                            str(self.schema_location)))
+
+        s = "{0.uri}\n  {0.prefixes}\n  preferred: {1}\n  {0.schema_location}"
+        return s.format(self, preferred_prefix)
 
 
 class NamespaceSet(object):
@@ -218,6 +194,24 @@ class NamespaceSet(object):
         # __ns_uri_map.  More than one key may map to the same value.
         self.__prefix_map = {}
 
+    def __lookup_uri(self, uri):
+        """Return a _NamespaceInfo object that is currently associated with the
+        input namespace `uri`.
+        """
+        try:
+            return self.__ns_uri_map[uri]
+        except KeyError:
+            raise NamespaceNotFoundError(uri)
+
+    def __lookup_prefix(self, prefix):
+        """Return a _NamespaceInfo object that is currently associated with the
+        input `prefix`.
+        """
+        try:
+            return self.__prefix_map[prefix]
+        except KeyError:
+            raise PrefixNotFoundError(prefix)
+
     def __add_namespaceinfo(self, ni):
         """Internal method to directly add a _NamespaceInfo object to this
         set.  No sanity checks are done (e.g. checking for prefix conflicts),
@@ -237,56 +231,54 @@ class NamespaceSet(object):
         incoming_prefix to that URI.  If incoming_prefix maps to anything
         already, that represents a prefix conflict and an exception is raised.
         """
+        if incoming_prefix not in self.__prefix_map:
+            return
+
+        # Prefix found in the prefix map. Check that there are no conflicts
+        prefix_check_ni = self.__prefix_map[incoming_prefix]
+
         if isinstance(existing_ni_or_ns_uri, _NamespaceInfo):
             existing_ni = existing_ni_or_ns_uri  # makes following code clearer?
 
-            prefix_check_ni = self.__prefix_map.get(incoming_prefix)
-            if prefix_check_ni is not None and \
-                    prefix_check_ni is not existing_ni:
+            if prefix_check_ni is not existing_ni:
                 # A different obj implies a different namespace URI is
                 # already assigned to the prefix.
-                raise DuplicatePrefixError(incoming_prefix, prefix_check_ni.uri,
-                                           existing_ni.uri)
+                raise DuplicatePrefixError(incoming_prefix, prefix_check_ni.uri, existing_ni.uri)
         else:
             ns_uri = existing_ni_or_ns_uri  # makes following code clearer?
-
-            assert not self.contains_namespace(ns_uri)
-
-            prefix_check_ni = self.__prefix_map.get(incoming_prefix)
-            if prefix_check_ni is not None:
-                raise DuplicatePrefixError(incoming_prefix, prefix_check_ni.uri,
-                                           ns_uri)
+            assert not self.contains_namespace(ns_uri)  # TODO (bworrell): Should this be a raise?
+            raise DuplicatePrefixError(incoming_prefix, prefix_check_ni.uri, ns_uri)
 
     def contains_namespace(self, ns_uri):
         """Determines whether the namespace identified by ns_uri is in this
-        set."""
+        set.
+        """
         return ns_uri in self.__ns_uri_map
 
     def namespace_for_prefix(self, prefix):
         """Get the namespace the given prefix maps to.
 
-            Args:
-                prefix (str): The prefix
+        Args:
+            prefix (str): The prefix
 
-            Returns:
-                str: The namespace, or None if the prefix isn't mapped to
-                    anything in this set.
+        Returns:
+            str: The namespace, or None if the prefix isn't mapped to
+                anything in this set.
         """
-        ni = self.__prefix_map.get(prefix)
-        if ni:
+        try:
+            ni = self.__lookup_prefix(prefix)
+        except PrefixNotFoundError:
+            return None
+        else:
             return ni.uri
-        return None
 
     def preferred_prefix_for_namespace(self, ns_uri):
         """Get the "preferred" prefix for the given namespace.  Returns None
         if the preference is to use as the default namespace."""
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is None:
-            raise NamespaceNotFoundError(ns_uri)
+        ni = self.__lookup_uri(ns_uri)
         return ni.preferred_prefix
 
-    def set_preferred_prefix_for_namespace(self, ns_uri, prefix,
-                                           add_if_not_exist=False):
+    def set_preferred_prefix_for_namespace(self, ns_uri, prefix, add_if_not_exist=False):
         """Sets the preferred prefix for ns_uri.  If add_if_not_exist is True,
         the prefix is added if it's not already registered.  Otherwise,
         setting an unknown prefix as preferred is an error.  The default
@@ -305,41 +297,36 @@ class NamespaceSet(object):
             DuplicatePrefixError: If ``prefix`` already maps to a different
                 namespace.
         """
-
-        ni = self.__ns_uri_map.get(ns_uri)
-        if not ni:
-            raise NamespaceNotFoundError(ns_uri)
+        ni = self.__lookup_uri(ns_uri)
 
         if not prefix:
             ni.preferred_prefix = None
-        else:
-            if add_if_not_exist:
-                self.__check_prefix_conflict(ni, prefix)
-                ni.prefixes.add(prefix)
-                self.__prefix_map[prefix] = ni
-            else:
-                if prefix not in ni.prefixes:
-                    raise PrefixNotFoundError(prefix)
-
+        elif prefix in ni.prefixes:
             ni.preferred_prefix = prefix
+        elif add_if_not_exist:
+            self.add_prefix(ns_uri, prefix, set_as_preferred=True)
+        else:
+            raise PrefixNotFoundError(prefix)
 
     def __merge_schema_locations(self, ni, incoming_schemaloc):
         """Merge incoming_schemaloc into the given `_NamespaceInfo`, ni.  If we
         don't have one yet and the incoming value is non-None, update ours
-        with theirs.  This modifies ni."""
-        if ni.schema_location and incoming_schemaloc:
-            if ni.schema_location != incoming_schemaloc:
-                raise ConflictingSchemaLocationError(ni.uri,
-                                                     ni.schema_location,
-                                                     incoming_schemaloc)
-        elif ni.schema_location is None:
-                ni.schema_location = incoming_schemaloc or None
+        with theirs.  This modifies ni.
+        """
+        if ni.schema_location == incoming_schemaloc:  # TODO (bworrell): empty strings?
+            return
+        elif not ni.schema_location:
+            ni.schema_location = incoming_schemaloc or None
+        elif not incoming_schemaloc:
+            return
+        else:
+            raise ConflictingSchemaLocationError(ni.uri, ni.schema_location, incoming_schemaloc)
 
     def add_namespace(self, ns):
         """Add a namespace from a :class:`Namespace` object.  This method
         just passes off the tuple fields to :meth:`add_namespace_uri`."""
         assert isinstance(ns, Namespace)
-        self.add_namespace_uri(ns.name, ns.prefix, ns.schema_location)
+        self.add_namespace_uri(*ns)
 
     def add_namespace_uri(self, ns_uri, prefix=None, schema_location=None):
         """Adds a new namespace to this set, optionally with a prefix and
@@ -368,18 +355,17 @@ class NamespaceSet(object):
             ConflictingSchemaLocationError: If a schema location is given and
                 the namespace already exists in this set with a different
                 schema location.
-
         """
         assert ns_uri
 
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni:
+        if ns_uri in self.__ns_uri_map:
             # We have a _NamespaceInfo object for this URI already.  So this
             # is a merge operation.
             #
             # We modify a copy of the real _NamespaceInfo so that we are
             # exception-safe: if something goes wrong, we don't end up with a
             # half-changed NamespaceSet.
+            ni = self.__lookup_uri(ns_uri)
             new_ni = copy.deepcopy(ni)
 
             # Reconcile prefixes
@@ -403,17 +389,16 @@ class NamespaceSet(object):
                 self.__check_prefix_conflict(ns_uri, prefix)
 
             ni = _NamespaceInfo(ns_uri, prefix, schema_location)
-            self.__ns_uri_map[ns_uri] = ni
-            if prefix:
-                self.__prefix_map[prefix] = ni
+            self.__add_namespaceinfo(ni)
 
     def remove_namespace(self, ns_uri):
         """Removes the indicated namespace from this set."""
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is not None:
-            del self.__ns_uri_map[ns_uri]
-            for prefix in ni.prefixes:
-                del self.__prefix_map[prefix]
+        if not self.contains_namespace(ns_uri):
+            return
+
+        ni = self.__ns_uri_map.pop(ns_uri)
+        for prefix in ni.prefixes:
+            del self.__prefix_map[prefix]
 
     def add_prefix(self, ns_uri, prefix, set_as_preferred=False):
         """Adds prefix for the given namespace URI.  The namespace must already
@@ -433,45 +418,39 @@ class NamespaceSet(object):
         """
         assert prefix
 
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is None:
-            raise NamespaceNotFoundError(ns_uri)
+        ni = self.__lookup_uri(ns_uri)
 
         self.__check_prefix_conflict(ni, prefix)
         ni.prefixes.add(prefix)
         self.__prefix_map[prefix] = ni
+
         if set_as_preferred:
             ni.preferred_prefix = prefix
 
     def get_prefixes(self, ns_uri):
         """Gets (a copy of) the prefix set for the given namespace."""
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is None:
-            raise NamespaceNotFoundError(ns_uri)
-
+        ni = self.__lookup_uri(ns_uri)
         return ni.prefixes.copy()
 
     def prefix_iter(self, ns_uri):
         """Gets an iterator over the prefixes for the given namespace."""
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is None:
-            raise NamespaceNotFoundError(ns_uri)
-
+        ni = self.__lookup_uri(ns_uri)
         return iter(ni.prefixes)
 
     def remove_prefix(self, prefix):
         """Removes prefix from this set.  This is a no-op if the prefix
-        doesn't exist in it."""
-        ni = self.__prefix_map.get(prefix)
-        if ni is not None:
-            ni.prefixes.discard(prefix)
-            del self.__prefix_map[prefix]
-            if ni.preferred_prefix == prefix:
-                # Choose some other prefix as the new preferred.
-                if len(ni.prefixes) == 0:
-                    ni.preferred_prefix = None
-                else:
-                    ni.preferred_prefix = next(iter(ni.prefixes))
+        doesn't exist in it.
+        """
+        if prefix not in self.__prefix_map:
+            return
+
+        ni = self.__lookup_prefix(prefix)
+        ni.prefixes.discard(prefix)
+        del self.__prefix_map[prefix]
+
+        # If we removed the preferred prefix, find a new one.
+        if ni.preferred_prefix == prefix:
+            ni.preferred_prefix = next(iter(ni.prefixes), None)
 
     def get_schema_location(self, ns_uri):
         """Gets the schema location URI for the given namespace.
@@ -485,10 +464,7 @@ class NamespaceSet(object):
         Raises:
             NamespaceNotFoundError: If the given namespace isn't in this set.
         """
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is None:
-            raise NamespaceNotFoundError(ns_uri)
-
+        ni = self.__lookup_uri(ns_uri)
         return ni.schema_location
 
     def set_schema_location(self, ns_uri, schema_location, replace=False):
@@ -511,19 +487,16 @@ class NamespaceSet(object):
                 schema_location is not None, and the namespace already has a
                 different schema location in this set.
         """
+        ni = self.__lookup_uri(ns_uri)
 
-        ni = self.__ns_uri_map.get(ns_uri)
-        if ni is None:
-            raise NamespaceNotFoundError(ns_uri)
-
-        if replace or ni.schema_location is None:
+        if ni.schema_location == schema_location:
+            return
+        elif replace or ni.schema_location is None:
             ni.schema_location = schema_location
         elif schema_location is None:
-            # Not considered "replacement".
-            ni.schema_location = None
-        elif ni.schema_location != schema_location:
-            raise ConflictingSchemaLocationError(ns_uri, ni.schema_location,
-                                                 schema_location)
+            ni.schema_location = None  # Not considered "replacement".
+        else:
+            raise ConflictingSchemaLocationError(ns_uri, ni.schema_location, schema_location)
 
     def get_xmlns_string(self, ns_uris=None, sort=False,
                          preferred_prefixes_only=True, delim="\n"):
@@ -562,29 +535,25 @@ class NamespaceSet(object):
                 encountered gets to be default.  Any subsequent namespaces
                 without any prefixes will cause this error.
         """
-
         if ns_uris is None:
             ns_uris = six.iterkeys(self.__ns_uri_map)
 
         if sort:
             ns_uris = sorted(ns_uris)
 
-        have_default = False
-        xmlns_str = ""
+        have_default  = False  # Flag for default xmlns entry.
+        xmlns_entries = []     # Stores all the xmlns:prefix=uri entries.
+
         for ns_uri in ns_uris:
-            ni = self.__ns_uri_map.get(ns_uri)
-            if not ni:
-                raise NamespaceNotFoundError(ns_uri)
+            ni = self.__lookup_uri(ns_uri)
 
             if preferred_prefixes_only:
                 if ni.preferred_prefix is not None:
-                    xmlns_str += 'xmlns:{0}="{1}"'.format(ni.preferred_prefix,
-                                                          ni.uri)
+                    xmlns = 'xmlns:{0.preferred_prefix}="{0.uri}"'.format(ni)
+                    xmlns_entries.append(xmlns)
             else:
-                xmlns_str += delim.join(
-                    'xmlns:{0}="'.format(prefix)+ni.uri+'"'
-                        for prefix in ni.prefixes
-                )
+                xmlns = 'xmlns:{0}="{1.uri}"'
+                xmlns_entries.extend(xmlns.format(prefix, ni) for prefix in ni.prefixes)
 
             if ni.preferred_prefix is None:
                 if have_default:
@@ -593,18 +562,19 @@ class NamespaceSet(object):
                     if len(ni.prefixes) == 0:
                         raise TooManyDefaultNamespacesError(ni.uri)
                     elif preferred_prefixes_only:
-                        xmlns_str += 'xmlns:{0}="{1}"'.format(
-                            next(iter(ni.prefixes)), ni.uri
-                        )
+                        prefix = next(iter(ni.prefixes))
+                        xmlns  = 'xmlns:{0}="{1.uri}"'.format(prefix, ni)
+                        xmlns_entries.append(xmlns)
+
                     # else, we already declared some prefixes for this
                     # namespace, so don't worry about our inability to use this
                     # as a default namespace.
                 else:
-                    xmlns_str += 'xmlns="{0}"'.format(ni.uri)
+                    xmlns = 'xmlns="{0.uri}"'.format(ni)
+                    xmlns_entries.append(xmlns)
+                    have_default = True
 
-                have_default = True
-            xmlns_str += delim
-
+        xmlns_str = delim.join(xmlns_entries) + delim
         return xmlns_str
 
     def get_schemaloc_string(self, ns_uris=None, sort=False, delim="\n"):
@@ -624,28 +594,24 @@ class NamespaceSet(object):
                 ``xsi:schemaLocation="nsuri schemaloc<delim>nsuri2 schemaloc2<delim>..."``
 
         """
-
         if not ns_uris:
             ns_uris = six.iterkeys(self.__ns_uri_map)
 
         if sort:
             ns_uris = sorted(ns_uris)
 
-        first = True
-        schemaloc_str = ""
-        for ns_uri in ns_uris:
-            ni = self.__ns_uri_map[ns_uri]
-            if not ni.schema_location:
-                continue
-            if not first:
-                schemaloc_str += delim
-            schemaloc_str += "{0.uri} {0.schema_location}".format(ni)
-            first = False
+        schemalocs = []
 
-        if len(schemaloc_str) == 0:
+        for ns_uri in ns_uris:
+            ni = self.__lookup_uri(ns_uri)
+
+            if ni.schema_location:
+                schemalocs.append("{0.uri} {0.schema_location}".format(ni))
+
+        if not schemalocs:
             return None
 
-        return 'xsi:schemaLocation="{0}"'.format(schemaloc_str)
+        return 'xsi:schemaLocation="{0}"'.format(delim.join(schemalocs))
 
     def get_uri_prefix_map(self):
         """Constructs and returns a map from namespace URI to prefix,
@@ -653,21 +619,22 @@ class NamespaceSet(object):
         namespace is its preferred prefix if it's not None.  If the preferred
         prefix is None, one is chosen from the set of registered
         prefixes.  In the latter situation, if no prefixes are registered,
-        an exception is raised."""
-        the_map = {}
+        an exception is raised.
+        """
+        mapping = {}
+        
         for ni in six.itervalues(self.__ns_uri_map):
             if ni.preferred_prefix:
-                the_map[ni.uri] = ni.preferred_prefix
+                mapping[ni.uri] = ni.preferred_prefix
+            elif len(ni.prefixes) > 0:
+                mapping[ni.uri] = next(iter(ni.prefixes))
             else:
                 # The reason I don't let any namespace map to None here is that
                 # I don't think generateDS supports it.  It requires prefixes
                 # for all namespaces.
-                if len(ni.prefixes) == 0:
-                    raise NoPrefixesError(ni.uri)
-                else:
-                    the_map[ni.uri] = next(iter(ni.prefixes))
+                raise NoPrefixesError(ni.uri)
 
-        return the_map
+        return mapping
 
     def get_prefix_uri_map(self):
         """Constructs and returns a map from to prefix to namespace URI,
@@ -675,28 +642,31 @@ class NamespaceSet(object):
         namespace is its preferred prefix if it's not None.  If the preferred
         prefix is None, one is chosen from the set of registered
         prefixes.  In the latter situation, if no prefixes are registered,
-        an exception is raised."""
-        the_map = {}
+        an exception is raised.
+        """
+        mapping = {}
+
         for ni in six.itervalues(self.__ns_uri_map):
             if ni.preferred_prefix:
-                the_map[ni.preferred_prefix] = ni.uri
+                mapping[ni.preferred_prefix] = ni.uri
+            elif len(ni.prefixes) > 0:
+                prefix = next(iter(ni.prefixes))
+                mapping[prefix] = ni.uri
             else:
-                if len(ni.prefixes) == 0:
-                    raise NoPrefixesError(ni.uri)
-                else:
-                    the_map[next(iter(ni.prefixes))] = ni.uri
+                raise NoPrefixesError(ni.uri)
 
-        return the_map
+        return mapping
 
     def get_uri_schemaloc_map(self):
         """Constructs and returns a map from namespace URI to schema location
         URI.  Namespaces without schema locations are excluded."""
-        the_map = {}
+        mapping = {}
+
         for ni in six.itervalues(self.__ns_uri_map):
             if ni.schema_location:
-                the_map[ni.uri] = ni.schema_location
+                mapping[ni.uri] = ni.schema_location
 
-        return the_map
+        return mapping
 
     @property
     def namespace_uris(self):
@@ -720,11 +690,9 @@ class NamespaceSet(object):
                 match any namespaces in this set.
         """
         sub_ns = NamespaceSet()
-        for ns_uri in ns_uris:
-            ni = self.__ns_uri_map.get(ns_uri)
-            if ni is None:
-                raise NamespaceNotFoundError(ns_uri)
 
+        for ns_uri in ns_uris:
+            ni = self.__lookup_uri(ns_uri)
             new_ni = copy.deepcopy(ni)
 
             # We should be able to reach into details of our own
@@ -752,6 +720,7 @@ class NamespaceSet(object):
         """
         for other_ns_uri in other_ns.namespace_uris:
             ni = self.__ns_uri_map.get(other_ns_uri)
+
             if ni is None:
                 other_ni = other_ns._NamespaceSet__ns_uri_map[other_ns_uri]
 
@@ -762,17 +731,18 @@ class NamespaceSet(object):
 
                 cloned_ni = copy.deepcopy(other_ni)
                 self.__add_namespaceinfo(cloned_ni)
+            elif replace:
+                other_ni = other_ns._NamespaceSet__ns_uri_map[other_ns_uri]
+                for other_prefix in other_ni.prefixes:
+                    self.__check_prefix_conflict(ni, other_prefix)
+
+                cloned_ni = copy.deepcopy(other_ni)
+                self.remove_namespace(other_ns_uri)
+                self.__add_namespaceinfo(cloned_ni)
             else:
-                if replace:
-                    other_ni = other_ns._NamespaceSet__ns_uri_map[other_ns_uri]
-                    for other_prefix in other_ni.prefixes:
-                        self.__check_prefix_conflict(ni, other_prefix)
+                continue  # TODO (bworrell): Should this log/warn/do anything else?
 
-                    cloned_ni = copy.deepcopy(other_ni)
-                    self.remove_namespace(other_ns_uri)
-                    self.__add_namespaceinfo(cloned_ni)
-
-    def is_valid(self):
+    def is_valid(self):  # TODO (bworrell): Change this to assert_valid() that raises Exceptions if invalid?
         """For debugging; does some sanity checks on this set."""
         for ns_uri, ni in six.iteritems(self.__ns_uri_map):
             if not ni.uri:
@@ -806,26 +776,18 @@ class NamespaceSet(object):
         contain the same namespaces, and for each namespace, their prefixes,
         schema location, and preferred prefix must also be the same."""
 
-        assert isinstance(other, NamespaceSet)
-        if len(other) != len(self):
+        if type(other) != type(self):
             return False
-
-        for ns_uri, ni in six.iteritems(self.__ns_uri_map):
-
-            other_ni = other._NamespaceSet__ns_uri_map.get(ns_uri)
-            if other_ni is None:
-                return False
-
-            if ni != other_ni:
-                return False
-
-        return True
+        elif len(other) != len(self):
+            return False
+        else:
+            return self.__ns_uri_map == other._NamespaceSet__ns_uri_map
 
     def __ne__(self, other):
         """Python2 apparently needs this; python3 has a suitable default
         which delegates to __eq__.
         """
-        return not self == other
+        return not self.__eq__(other)
 
     def __str__(self):
         """for debugging"""

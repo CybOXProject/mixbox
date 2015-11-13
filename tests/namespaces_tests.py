@@ -59,7 +59,7 @@ class TestNamespaceSet(unittest.TestCase):
 
         self.assertTrue(nsset.contains_namespace("http://example.com/"))
 
-        self.assertTrue(nsset.is_valid())
+        self.assertTrue(nsset.is_valid()[0])
 
     def test_prefixes(self):
         ns = NamespaceSet()
@@ -105,7 +105,7 @@ class TestNamespaceSet(unittest.TestCase):
 
         ns.remove_prefix("does:not:exist")
 
-        self.assertTrue(ns.is_valid())
+        self.assertTrue(ns.is_valid()[0])
 
     def test_preferred_prefixes(self):
         ns = NamespaceSet()
@@ -133,7 +133,7 @@ class TestNamespaceSet(unittest.TestCase):
                           ns.set_preferred_prefix_for_namespace,
                           "a:b:c", "notaprefix")
 
-        self.assertTrue(ns.is_valid())
+        self.assertTrue(ns.is_valid()[0])
 
 
     def test_schema_locations(self):
@@ -158,7 +158,15 @@ class TestNamespaceSet(unittest.TestCase):
         ns.set_schema_location("a:b:c", "sc:he:ma2", True)
         self.assertEqual(ns.get_schema_location("a:b:c"), "sc:he:ma2")
 
-        self.assertTrue(ns.is_valid())
+        # test schema location merging; these should not raise exceptions
+        ns.add_namespace_uri("a:b:c", "abc", None)
+        self.assertEqual(ns.get_schema_location("a:b:c"), "sc:he:ma2")
+
+        ns.add_namespace_uri("d:e:f", "def", None)
+        ns.add_namespace_uri("d:e:f", "def", "def:schema")
+        self.assertEqual(ns.get_schema_location("d:e:f"), "def:schema")
+
+        self.assertTrue(ns.is_valid()[0])
 
     def test_maps(self):
         ns = NamespaceSet()
@@ -206,7 +214,7 @@ class TestNamespaceSet(unittest.TestCase):
                         "ghi2" in pfx_uri_map or
                         "ghi3" in pfx_uri_map)
 
-        self.assertTrue(ns.is_valid())
+        self.assertTrue(ns.is_valid()[0])
 
     # For verifying the overall format of the xmlns string.  It's in two parts,
     # 'cause I need to get the inner whitespace separation right.  The basic
@@ -234,8 +242,9 @@ class TestNamespaceSet(unittest.TestCase):
     # For verifying the overall format of the schemalocation string.  This
     # matches the whole thing, and has no captures.
     SCHEMALOC_RE_NO_CAP = re.compile(r"""
-                                         ^xsi:schemaLocation="\s*
-                                         (?:\S+\s+\S+)*   # ns/schemaloc pairs
+                                         ^xsi:schemaLocation\s*=\s*"\s*
+                                         (?:\S+\s+\S+)       # first ns/loc pair
+                                         (?:\s+\S+\s+\S+)*   # rest of ns/loc pairs
                                          \s*"$
                                       """, re.X)
 
@@ -243,10 +252,11 @@ class TestNamespaceSet(unittest.TestCase):
         """Converts an xml namespace declaration string to a NamespaceSet."""
         ns = NamespaceSet()
         for m in self.XMLNS_RE.finditer(xmlns_string):
-            pfx = m.group(1)
+            pfx  = m.group(1)
+            uri  = m.group(2)
             if pfx and pfx[0] == ":": # drop leading colons if any
                 pfx = pfx[1:]
-            ns.add_namespace_uri(m.group(2), pfx)
+            ns.add_namespace_uri(uri, pfx)
         return ns
 
     def __get_schema_location_pairs(self, schemaloc_string):
@@ -300,8 +310,8 @@ class TestNamespaceSet(unittest.TestCase):
         self.assertTrue(ns2.contains_namespace("d:e:f"))
         self.assertTrue(ns2.contains_namespace("g:h:i"))
 
-        self.assertEqual(ns2.get_prefixes("a:b:c"), set(("abc",)))
-        self.assertEqual(ns2.get_prefixes("d:e:f"), set(("def",)))
+        self.assertEqual(ns2.get_prefixes("a:b:c"), {"abc"})
+        self.assertEqual(ns2.get_prefixes("d:e:f"), {"def"})
         self.assertEqual(len(ns2.get_prefixes("g:h:i")), 0)
 
         self.assertEqual(ns2.preferred_prefix_for_namespace("a:b:c"), "abc")
@@ -366,7 +376,7 @@ class TestNamespaceSet(unittest.TestCase):
         # entry with (a copy of) imported_ns2's entry.
         ns.import_from(imported_ns2, True)
 
-        self.assertEqual(ns.get_prefixes("a:b:c"), set(("abc2",)))
+        self.assertEqual(ns.get_prefixes("a:b:c"), {"abc2"})
         self.assertIsNone(ns.get_schema_location("a:b:c"))
 
         imported_ns3 = NamespaceSet()
@@ -374,7 +384,7 @@ class TestNamespaceSet(unittest.TestCase):
         self.assertRaises(mixbox.namespaces.DuplicatePrefixError,
                           ns.import_from, imported_ns3)
 
-        self.assertTrue(ns.is_valid())
+        self.assertTrue(ns.is_valid()[0])
 
 if __name__ == "__main__":
     unittest.main()
