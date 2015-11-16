@@ -69,6 +69,9 @@ class TypedList(collections.MutableSequence):
             )
             six.reraise(TypeError, TypeError(error), sys.exc_info()[-1])
 
+    def _is_type_castable(self):
+        return getattr(self._type, "_try_cast", False)
+
     def __nonzero__(self):
         return bool(self._inner)
 
@@ -98,9 +101,14 @@ class TypedList(collections.MutableSequence):
     def insert(self, idx, value):
         if value is None and self._ignore_none:
             return
-        elif not self._is_valid(value):
+        elif self._is_valid(value):
+            self._inner.insert(idx, value)
+        elif self._is_type_castable():
             value = self._fix_value(value)
-        self._inner.insert(idx, value)
+            self._inner.insert(idx, value)
+        else:
+            err = "Cannot insert type (%s) into %s" % (type(value), type(self))
+            raise TypeError(err)
 
     def __repr__(self):
         return self._inner.__repr__()
