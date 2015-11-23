@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 from distutils.version import StrictVersion
 
 from .exceptions import ignored
-from .xml import get_etree_root, get_schemaloc_pairs
+from .xml import get_etree_root, get_etree, get_schemaloc_pairs
 
 
 class UnknownVersionError(Exception):
@@ -150,7 +150,7 @@ class EntityParser(object):
         entity_obj = entity_class._binding_class.factory()
         entity_obj.build(root)
 
-        return entity_obj, root
+        return entity_obj
 
     def parse_xml(self, xml_file, check_version=True, check_root=True,
                   encoding=None):
@@ -175,13 +175,14 @@ class EntityParser(object):
 
         """
 
-        entity_obj, xml_root_node = self.parse_xml_to_obj(
-            xml_file=xml_file,
+        xml_etree = get_etree(xml_file, encoding=encoding)
+        entity_obj = self.parse_xml_to_obj(
+            xml_file=xml_etree,
             check_version=check_version,
-            check_root=check_root,
-            encoding=encoding
+            check_root=check_root
         )
 
+        xml_root_node = xml_etree.getroot()
         entity = self.get_entity_class(xml_root_node.tag).from_obj(entity_obj)
 
         # Save the parsed nsmap and schemalocations onto the parsed Entity
