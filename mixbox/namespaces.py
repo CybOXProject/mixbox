@@ -4,10 +4,16 @@
 Utilities for dealing with XML namespaces.
 """
 
+# stdlib
 import collections
 import copy
 
+# external
+from ordered_set import OrderedSet
+
+# internal
 from mixbox.vendor import six
+
 
 _NamespaceTuple = collections.namedtuple("Namespace",
                                          "name prefix schema_location")
@@ -131,7 +137,7 @@ class _NamespaceInfo(object):
         """
         self.uri = None
         self.schema_location = None
-        self.prefixes = set()
+        self.prefixes = OrderedSet()
         self.preferred_prefix = None
 
     def __construct_from_namespace(self, ns):
@@ -254,6 +260,27 @@ class NamespaceSet(object):
         set.
         """
         return ns_uri in self.__ns_uri_map
+
+    def __contains__(self, item):
+        """Return True if the `item` is held by the NamespaceSet.
+
+        If the `item` is a string, return True if the NamespaceSet contains
+        a _NamespaceInfo object with a matching ``.uri`` member value.
+
+        Args:
+            item: A namespace uri or a _NamespaceInfo object.
+
+        Raises:
+            TypeError: If the `item` is not a string or _NamespaceInfo object.
+        """
+        if isinstance(item, _NamespaceInfo):
+            return item in six.itervalues(self.__ns_uri_map)
+
+        if isinstance(item, basestring):
+            return self.contains_namespace(item)
+
+        msg = "Invalid type: %s. Expected _NamespaceInfo or string. "
+        raise TypeError(msg % type(item))
 
     def namespace_for_prefix(self, prefix):
         """Get the namespace the given prefix maps to.
@@ -536,7 +563,7 @@ class NamespaceSet(object):
                 without any prefixes will cause this error.
         """
         if ns_uris is None:
-            ns_uris = six.iterkeys(self.__ns_uri_map)
+            ns_uris = self.namespace_uris
 
         if sort:
             ns_uris = sorted(ns_uris)
@@ -749,8 +776,8 @@ class NamespaceSet(object):
                 return False, "uri not set in namespaceinfo"
             if ns_uri != ni.uri:
                 return False, "uri mismatch in dict and namespaceinfo"
-            if ni.preferred_prefix is not None and \
-               ni.preferred_prefix not in ni.prefixes:
+            if (ni.preferred_prefix is not None and
+                ni.preferred_prefix not in ni.prefixes):
                 return False, "preferred prefix not in prefixes"
             for prefix in ni.prefixes:
                 if not prefix:
@@ -803,11 +830,13 @@ def register_namespace(namespace):
     __ALL_NAMESPACES.add_namespace(namespace)
 
 
-def lookup_name(name):
-    return __ALL_NAMESPACES.preferred_prefix_for_namespace(name)
+def lookup_name(ns_uri):
+    """Return the preferred prefix for the input namespace uri."""
+    return __ALL_NAMESPACES.preferred_prefix_for_namespace(ns_uri)
 
 
 def lookup_prefix(prefix):
+    """Return the namespace uri that is mapped to the input prefix."""
     return __ALL_NAMESPACES.namespace_for_prefix(prefix)
 
 
