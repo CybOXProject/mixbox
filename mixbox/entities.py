@@ -42,31 +42,105 @@ def _dictify(field, value):
 
 
 class EntityFactory(object):
-    _dictkey = "xsi:type"
-    _objkey  = "xsi_type"
+    """The EntityFactory class handles type key => class resolution during
+    parse time.
+
+    Generally, this class will use xsi:type as a class lookup key, but there
+    may be instances where xsi:type is not be the appropriate key. As such
+    this class was designed to be flexible enough to handle multiple class
+    resolution scenarios.
+
+    Any of the methods defined below can be overridden for non-standard
+    keys or lookup scenarios.
+
+    Attributes:
+        _dictkey: The key associated with type information in an Entity
+            dictionary. Default is "xsi:type".
+        _objkey: The attribute associated with type information in a
+            generateDS binding object. Default is "xsi_type"
+    """
+
+    _dictkey = "xsi:type"  # dictionary key holding type information
+    _objkey  = "xsi_type"  # generateDS object attr holding type information.
+
 
     @classmethod
     def entity_class(cls, key):
-        """Must be implemented by a subclass."""
+        """**Abstract** This method take the `key` (e.g., xsi:type value) and
+        returns the Entity class associated with it.
+
+        Args:
+            key: The class lookup key. Generally this is an xsi:type attribute
+                value.
+
+        Returns:
+            The class associated with the input `key`.
+
+        Raises:
+            This should raise ValueError if no class is associated with the
+            input key.
+        """
         raise NotImplementedError()
 
     @classmethod
     def instance(cls, key, *args, **kwargs):
+        """Create an instance of the class associated with the `key` (xsi:type)
+        and initialize it with the *args and **kwargs.
+
+        Args:
+            key: A class lookup key (see entity_class()).
+
+        Returns:
+            An instance of the class associated with the `key`.
+        """
         klass = cls.entity_class(key)
         return klass(*args, **kwargs)
 
     @classmethod
     def objkey(cls, obj):
+        """Return the class lookup key from the input generateDS object.
+        If no type information or lookup keys are found on the binding object
+        return None.
+
+        Args:
+            obj: A generateDS binding object.
+
+        Returns:
+            A class lookup key (string) or None.
+        """
         return getattr(obj, cls._objkey, None)
 
     @classmethod
     def dictkey(cls, mapping):
-        if isinstance(mapping, dict):
-            return mapping.get(cls._dictkey)
-        return None
+        """Return the class lookup key from the input dictionary.
+        If no type information or lookup keys are found on the binding object
+        return None.
+
+        Args:
+            mapping: A dictionary representation of an Entity instance.
+
+        Returns:
+            A class lookup key (string) or None.
+        """
+        try:
+            return mapping[cls._dictkey]
+        except (KeyError, AttributeError):
+            return None
 
     @classmethod
     def from_dict(cls, cls_dict):
+        """Parse the dictionary and return an Entity instance.
+
+        This will attempt to extract type information from the input
+        dictionary and pass it to entity_class to resolve the correct class
+        for the type.
+
+        Args:
+            cls_dict: A dictionary representation of an Entity object.
+
+        Returns:
+            An Entity instance.
+        """
         if not cls_dict:
             return None
 
@@ -76,6 +150,18 @@ class EntityFactory(object):
 
     @classmethod
     def from_obj(cls, cls_obj):
+        """Parse the generateDS object and return an Entity instance.
+
+        This will attempt to extract type information from the input
+        object and pass it to entity_class to resolve the correct class
+        for the type.
+
+        Args:
+            cls_obj: A generateDS object.
+
+        Returns:
+            An Entity instance.
+        """
         if not cls_obj:
             return None
 
