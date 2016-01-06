@@ -91,12 +91,14 @@ def needkwargs(*argnames):
         ValueError: If a required kwarg is missing in the decorated function
             call.
     """
+    required = set(argnames)
+
     def decorator(func):
         def inner(*args, **kwargs):
-            for name in argnames:
-                if name not in kwargs:
-                    err = "'%s' param is required as a kwarg." % name
-                    raise ValueError(err)
+            missing = required - set(kwargs)
+            if missing:
+                err = "%s kwargs are missing." % list(missing)
+                raise ValueError(err)
             return func(*args, **kwargs)
         return inner
     return decorator
