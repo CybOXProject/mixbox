@@ -185,6 +185,10 @@ class Entity(object):
     @classmethod
     def typed_fields(cls):
         """Return a tuple of this entity's TypedFields."""
+
+        # Checking cls._typed_fields could return a superclass _typed_fields
+        # value. So we check our class __dict__ which does not include
+        # inherited attributes.
         klassdict = cls.__dict__
 
         try:

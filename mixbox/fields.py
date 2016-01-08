@@ -295,11 +295,11 @@ class TypedField(object):
         TypedFields store themselves as a key in an Entity._fields dictionary
         and use themselves as a key for value retrieval.
 
-        The deecopy() function would normally descend into the _fields dictionary
+        The deepcopy() function would normally descend into the _fields dictionary
         of an Entity and replace the keys with *copies* of the original
         TypedFields.
 
-        As such, a TypedField would never find itself in a deecopied Entity,
+        As such, a TypedField would never find itself in a deepcopied Entity,
         because the _fields dictionary had its keys swapped out for copies
         of the original TypedField.
 
