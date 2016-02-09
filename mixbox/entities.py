@@ -144,6 +144,9 @@ class EntityFactory(object):
         if not cls_dict:
             return None
 
+        if isinstance(cls_dict, str) or isinstance(cls_dict, unicode):
+            return cls_dict
+
         typekey = cls.dictkey(cls_dict)
         klass   = cls.entity_class(typekey)
         return klass.from_dict(cls_dict)
