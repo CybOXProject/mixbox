@@ -4,7 +4,7 @@
 import collections
 import json
 
-from . import idgen
+from . import idgen, signals
 from .binding_utils import save_encoding
 from .datautils import is_sequence
 from .namespaces import Namespace, lookup_name, lookup_prefix
@@ -333,6 +333,8 @@ class Entity(object):
                     val = transformer.from_obj(val)
 
             field.__set__(entity, val)
+
+        signals.emit("Entity.created.from_obj", entity, cls_obj)
         return entity
 
     @classmethod
