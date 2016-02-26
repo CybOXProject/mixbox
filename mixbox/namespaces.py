@@ -120,25 +120,15 @@ class _NamespaceInfo(object):
         """
         iterargs = iter(args)
         ns       = next(iterargs, None)
+        if ns is None:
+            raise ValueError("At least one arg is required")
 
-        if not args:
-            self.__default_construct()
-        elif isinstance(ns, Namespace):
+        if isinstance(ns, Namespace):
             self.__construct_from_namespace(ns)
         else:
             prefix    = next(iterargs, None)
             schemaloc = next(iterargs, None)
             self.__construct_from_components(ns, prefix, schemaloc)
-
-    def __default_construct(self):
-        """Default-construct this object.
-        Internal use only; it constructs an invalid object.  Further
-        initialization is required to make it valid.
-        """
-        self.uri = None
-        self.schema_location = None
-        self.prefixes = OrderedSet()
-        self.preferred_prefix = None
 
     def __construct_from_namespace(self, ns):
         """Initialize this instance from a given Namespace object."""
