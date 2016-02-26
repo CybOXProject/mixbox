@@ -261,26 +261,15 @@ class NamespaceSet(object):
         """
         return ns_uri in self.__ns_uri_map
 
-    def __contains__(self, item):
-        """Return True if the `item` is held by the NamespaceSet.
-
-        If the `item` is a string, return True if the NamespaceSet contains
-        a _NamespaceInfo object with a matching ``.uri`` member value.
+    def __contains__(self, ns_uri):
+        """Return True if the `ns_uri` is held by the NamespaceSet.  Just
+        invokes contains_namespace().  This method enables the "X in Y" style
+        of code to check for containment.
 
         Args:
-            item: A namespace uri or a _NamespaceInfo object.
-
-        Raises:
-            TypeError: If the `item` is not a string or _NamespaceInfo object.
+            ns_uri: A namespace uri
         """
-        if isinstance(item, _NamespaceInfo):
-            return item in six.itervalues(self.__ns_uri_map)
-
-        if isinstance(item, basestring):
-            return self.contains_namespace(item)
-
-        msg = "Invalid type: %s. Expected _NamespaceInfo or string. "
-        raise TypeError(msg % type(item))
+        return self.contains_namespace(ns_uri)
 
     def namespace_for_prefix(self, prefix):
         """Get the namespace the given prefix maps to.
