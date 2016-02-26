@@ -153,7 +153,7 @@ class _NamespaceInfo(object):
 
         self.uri = ns_uri
         self.schema_location = schema_location or None
-        self.prefixes = set()
+        self.prefixes = OrderedSet()
 
         if prefix:
             self.prefixes.add(prefix)
