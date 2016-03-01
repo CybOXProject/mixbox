@@ -1,21 +1,20 @@
 # Copyright (c) 2015, The MITRE Corporation. All rights reserved.
 # See LICENSE.txt for complete terms.
 
+# stdlib
 import collections
 import inspect
 import json
-import itertools
 import warnings
 
+# relative
 from . import idgen
+from . import namespaces
 from .binding_utils import save_encoding
 from .datautils import is_sequence
 from .fields import TypedField
-from .namespaces import Namespace, lookup_prefix, make_namespace_subset_from_uris
-from .namespaces import get_xmlns_string, get_schemaloc_string
 from .vendor import six
-from mixbox import idgen
-import mixbox.namespaces
+
 
 def _objectify(value, return_obj, ns_info):
     """Make `value` suitable for a binding object.
@@ -258,6 +257,7 @@ class Entity(object):
 
         ns_collector = NamespaceCollector()
         gds_obj = self.to_obj(ns_info=ns_collector if include_namespaces else None)
+
         if include_namespaces:
             ns_collector.finalize(namespace_dict)
             delim = "\n\t" if pretty else " "
@@ -293,42 +293,6 @@ class Entity(object):
             d = json.loads(json_doc)
 
         return cls.from_dict(d)
-
-    def _get_namespaces(self, recurse=True):
-        """Only used in a couple places in nose tests now."""
-        nsset = set()
-
-        # Get all _namespaces for parent classes
-        namespaces = [x._namespace for x in self.__class__.__mro__
-                      if hasattr(x, '_namespace')]
-
-        nsset.update(namespaces)
-
-        #In case of recursive relationships, don't process this item twice
-        self.touched = True
-        if recurse:
-            for x in self._get_children():
-                if not hasattr(x, 'touched'):
-                    nsset.update(x._get_namespaces())
-        del self.touched
-
-        return nsset
-
-    def _get_children(self):
-        #TODO: eventually everything should be in _fields, not the top level
-        # of vars()
-
-        members = {}
-        members.update(vars(self))
-        members.update(self._fields)
-
-        for v in six.itervalues(members):
-            if isinstance(v, Entity):
-                yield v
-            elif isinstance(v, list):
-                for item in v:
-                    if isinstance(item, Entity):
-                        yield item
 
     @classmethod
     def istypeof(cls, obj):
@@ -510,8 +474,9 @@ class NamespaceCollector(object):
         self._input_schemalocs.update(ns_info._input_schemalocs)  # noqa
 
     def _parse_collected_classes(self):
-        alias_to_ns_uri = {}
-        no_alias_ns_uris = []
+        alias2uri = {}     # namespace alias to namespace uri mapping
+        noalias   = set()  # namespaces that have no alias defined by a class.
+
         for klass in self._collected_classes:
             # Prevents exception being raised if/when
             # collections.MutableSequence or another base class appears in the
@@ -525,7 +490,7 @@ class NamespaceCollector(object):
             # used for its namespace.
             alias = getattr(klass, "_XSI_NS", None)
             if alias:
-                alias_to_ns_uri[alias] = ns
+                alias2uri[alias] = ns
                 continue
 
             # Many stix/cybox entity classes have an _XSI_TYPE attribute that
@@ -533,21 +498,23 @@ class NamespaceCollector(object):
             # associated xsi:type.
             xsi_type = getattr(klass, "_XSI_TYPE", None)
             if not xsi_type:
-                no_alias_ns_uris.append(ns)
+                noalias.add(ns)
                 continue
 
             # Attempt to split the xsi:type attribute value into the ns alias
             # and the typename.
             typeinfo = xsi_type.split(":")
             if len(typeinfo) == 2:
-                alias_to_ns_uri[typeinfo[0]] = ns
+                alias2uri[typeinfo[0]] = ns
             else:
-                no_alias_ns_uris.append(ns)
+                noalias.add(ns)
 
+        # Compile a list of all seen Namespace URIs
+        uris = list(six.itervalues(alias2uri)) + list(noalias)
+
+        # A mixbox NamespaceSet object from our collected URIs.
         # Unrecognized namespace URIs will cause an error at this stage.
-        self._collected_namespaces = mixbox.namespaces.make_namespace_subset_from_uris(
-            itertools.chain(six.itervalues(alias_to_ns_uri), no_alias_ns_uris)
-        )
+        nsset = namespaces.make_namespace_subset_from_uris(uris)
 
         # For some reason, prefixes are specified in API class vars and also in
         # our big namespace tables.  From python-cybox issue #274 [1], I
@@ -557,16 +524,25 @@ class NamespaceCollector(object):
         # we may have (but I doubt there will be any).
         #
         # 1. https://github.com/CybOXProject/python-cybox/issues/274
-        for prefix, ns_uri in six.iteritems(alias_to_ns_uri):
-            if self._collected_namespaces.preferred_prefix_for_namespace(ns_uri) is None:
-                self._collected_namespaces.set_preferred_prefix_for_namespace(
-                    ns_uri, prefix, True)
+        for prefix, ns_uri in six.iteritems(alias2uri):
+            preferred_prefix = nsset.preferred_prefix_for_namespace(ns_uri)
+
+            if preferred_prefix:
+                continue
+
+            nsset.set_preferred_prefix_for_namespace(
+                ns_uri=ns_uri,
+                prefix=prefix,
+                add_if_not_exist=True
+            )
+
+        # Set our internal _collected_namespaces to the populated NamespaceSet
+        self._collected_namespaces = nsset
 
     def _fix_example_namespace(self):
         """Attempts to resolve issues where our samples use
         'http://example.com/' for our example namespace but python-stix uses
         'http://example.com' by removing the former.
-
         """
         example_prefix = 'example'  # Example ns prefix
         idgen_prefix = idgen.get_id_namespace_prefix()
@@ -591,11 +567,11 @@ class NamespaceCollector(object):
         ``_parse_collected_classes()`` and attempts to merge them all.
 
         Raises:
-            mixbox.namespaces.DuplicatePrefixError: If namespace prefix was
+            .namespaces.DuplicatePrefixError: If namespace prefix was
                 mapped to more than one namespace.
-
+            .namespaces.NoPrefixError: If a namespace was collected that is
+                not mapped to a prefix.
         """
-
         if ns_dict:
             # Add the user's entries to our set
             for ns, alias in six.iteritems(ns_dict):
@@ -603,8 +579,8 @@ class NamespaceCollector(object):
 
         # Add the ID namespaces
         self._collected_namespaces.add_namespace_uri(
-            idgen.get_id_namespace(),
-            idgen.get_id_namespace_alias()
+            ns_uri=idgen.get_id_namespace(),
+            prefix=idgen.get_id_namespace_alias()
         )
 
         # Remap the example namespace to the one expected by the APIs if the
@@ -616,30 +592,40 @@ class NamespaceCollector(object):
             self._collected_namespaces.add_namespace_uri(uri, prefix)
 
         # Add some default XML namespaces to make sure they're there.
-        self._collected_namespaces.import_from(mixbox.namespaces.XML_NAMESPACES)
+        self._collected_namespaces.import_from(namespaces.XML_NAMESPACES)
 
         # python-stix's generateDS-generated binding classes can't handle
         # default namespaces.  So make sure there are no preferred defaults in
         # the set.  Get prefixes from the global namespace set if we have to.
         for ns_uri in self._collected_namespaces.namespace_uris:
-            if self._collected_namespaces.preferred_prefix_for_namespace(ns_uri) is None:
-                prefixes = self._collected_namespaces.get_prefixes(ns_uri)
-                if len(prefixes) > 0:
-                    prefix = next(iter(prefixes))
-                else:
-                    prefix = mixbox.namespaces.lookup_name(ns_uri)
+            preferred_prefix = self._collected_namespaces.preferred_prefix_for_namespace(ns_uri)
 
-                if prefix is None:
-                    raise mixbox.namespaces.NoPrefixesError(ns_uri)
+            if preferred_prefix:
+                continue
 
-                self._collected_namespaces.set_preferred_prefix_for_namespace(
-                    ns_uri, prefix, True)
+            # No preferred prefix set for namespace. Try to assign one.
+            prefixes = self._collected_namespaces.get_prefixes(ns_uri)
+
+            if prefixes:
+                prefix = next(iter(prefixes))
+            else:
+                prefix = namespaces.lookup_name(ns_uri)
+
+            if prefix is None:
+                raise namespaces.NoPrefixesError(ns_uri)
+
+            self._collected_namespaces.set_preferred_prefix_for_namespace(
+                ns_uri=ns_uri,
+                prefix=prefix,
+                add_if_not_exist=True
+            )
 
     def _finalize_schemalocs(self, schemaloc_dict=None):
+
         # If schemaloc_dict was passed in, make a copy so we don't mistakenly
         # modify the original.
         if schemaloc_dict:
-            schemaloc_dict = dict(six.iteritems(schemaloc_dict))
+            schemaloc_dict = schemaloc_dict.copy()
         else:
             schemaloc_dict = {}
 
@@ -658,37 +644,40 @@ class NamespaceCollector(object):
         # Now use the merged dict to update any schema locations we don't
         # already have.
         for ns, loc in six.iteritems(schemaloc_dict):
-            if self._collected_namespaces.contains_namespace(ns) and \
-                self._collected_namespaces.get_schema_location(ns) is None:
+            if (ns in self._collected_namespaces and
+                self._collected_namespaces.get_schema_location(ns) is None):
                 self._collected_namespaces.set_schema_location(ns, loc)
 
         # Warn if we are missing any schemalocations
         id_ns = idgen.get_id_namespace()
-        for ns in self._collected_namespaces.namespace_uris:
-            if self._collected_namespaces.get_schema_location(ns) is None:
-                if ns == id_ns or \
-                        mixbox.namespaces.XML_NAMESPACES.contains_namespace(ns) or \
-                        ns in schemaloc_dict:
-                    continue
 
-                error = "Unable to map namespace '{0}' to schemaLocation"
-                warnings.warn(error.format(ns))
+        for ns in self._collected_namespaces.namespace_uris:
+            if self._collected_namespaces.get_schema_location(ns):
+                continue
+
+            if (ns == id_ns or
+                ns in namespaces.XML_NAMESPACES or
+                ns in schemaloc_dict):
+                continue
+
+            error = "Unable to map namespace '{0}' to schemaLocation"
+            warnings.warn(error.format(ns))
 
     def finalize(self, ns_dict=None, schemaloc_dict=None):
         self._parse_collected_classes()
         self._finalize_namespaces(ns_dict)
         self._finalize_schemalocs(schemaloc_dict)
 
-        self.finalized_schemalocs = \
-            self._collected_namespaces.get_uri_schemaloc_map()
-        self.binding_namespaces = \
-            self._collected_namespaces.get_uri_prefix_map()
+        self.finalized_schemalocs = self._collected_namespaces.get_uri_schemaloc_map()
+        self.binding_namespaces = self._collected_namespaces.get_uri_prefix_map()
 
     def get_xmlns_string(self, delim):
         if self._collected_namespaces is None:
             return ""
+
         return self._collected_namespaces.get_xmlns_string(
-            preferred_prefixes_only=False, delim=delim
+            preferred_prefixes_only=False,
+            delim=delim
         )
 
     def get_schema_location_string(self, delim):
