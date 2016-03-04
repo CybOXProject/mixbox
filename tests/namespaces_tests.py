@@ -59,7 +59,7 @@ class TestNamespaceSet(unittest.TestCase):
 
         self.assertTrue(nsset.contains_namespace("http://example.com/"))
 
-        self.assertTrue(nsset.is_valid()[0])
+        self.assertTrue(nsset.is_valid())
 
     def test_prefixes(self):
         ns = NamespaceSet()
@@ -105,7 +105,7 @@ class TestNamespaceSet(unittest.TestCase):
 
         ns.remove_prefix("does:not:exist")
 
-        self.assertTrue(ns.is_valid()[0])
+        self.assertTrue(ns.is_valid())
 
     def test_preferred_prefixes(self):
         ns = NamespaceSet()
@@ -133,7 +133,7 @@ class TestNamespaceSet(unittest.TestCase):
                           ns.set_preferred_prefix_for_namespace,
                           "a:b:c", "notaprefix")
 
-        self.assertTrue(ns.is_valid()[0])
+        self.assertTrue(ns.is_valid())
 
 
     def test_schema_locations(self):
@@ -166,7 +166,7 @@ class TestNamespaceSet(unittest.TestCase):
         ns.add_namespace_uri("d:e:f", "def", "def:schema")
         self.assertEqual(ns.get_schema_location("d:e:f"), "def:schema")
 
-        self.assertTrue(ns.is_valid()[0])
+        self.assertTrue(ns.is_valid())
 
     def test_maps(self):
         ns = NamespaceSet()
@@ -214,7 +214,7 @@ class TestNamespaceSet(unittest.TestCase):
                         "ghi2" in pfx_uri_map or
                         "ghi3" in pfx_uri_map)
 
-        self.assertTrue(ns.is_valid()[0])
+        self.assertTrue(ns.is_valid())
 
     # For verifying the overall format of the xmlns string.  It's in two parts,
     # 'cause I need to get the inner whitespace separation right.  The basic
@@ -384,7 +384,7 @@ class TestNamespaceSet(unittest.TestCase):
         self.assertRaises(mixbox.namespaces.DuplicatePrefixError,
                           ns.import_from, imported_ns3)
 
-        self.assertTrue(ns.is_valid()[0])
+        self.assertTrue(ns.is_valid())
 
 if __name__ == "__main__":
     unittest.main()
