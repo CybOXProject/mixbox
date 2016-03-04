@@ -4,10 +4,16 @@
 Utilities for dealing with XML namespaces.
 """
 
+# stdlib
 import collections
 import copy
 
+# external
+from ordered_set import OrderedSet
+
+# internal
 from mixbox.vendor import six
+
 
 _NamespaceTuple = collections.namedtuple("Namespace",
                                          "name prefix schema_location")
@@ -144,7 +150,7 @@ class _NamespaceInfo(object):
 
         self.uri = ns_uri
         self.schema_location = schema_location or None
-        self.prefixes = set()
+        self.prefixes = OrderedSet()
 
         if prefix:
             self.prefixes.add(prefix)
@@ -251,6 +257,16 @@ class NamespaceSet(object):
         set.
         """
         return ns_uri in self.__ns_uri_map
+
+    def __contains__(self, ns_uri):
+        """Return True if the `ns_uri` is held by the NamespaceSet.  Just
+        invokes contains_namespace().  This method enables the "X in Y" style
+        of code to check for containment.
+
+        Args:
+            ns_uri: A namespace uri
+        """
+        return self.contains_namespace(ns_uri)
 
     def namespace_for_prefix(self, prefix):
         """Get the namespace the given prefix maps to.
@@ -533,7 +549,7 @@ class NamespaceSet(object):
                 without any prefixes will cause this error.
         """
         if ns_uris is None:
-            ns_uris = six.iterkeys(self.__ns_uri_map)
+            ns_uris = self.namespace_uris
 
         if sort:
             ns_uris = sorted(ns_uris)
@@ -759,8 +775,8 @@ class NamespaceSet(object):
                     )
                 )
 
-            if ni.preferred_prefix is not None and \
-               ni.preferred_prefix not in ni.prefixes:
+            if (ni.preferred_prefix is not None and
+               ni.preferred_prefix not in ni.prefixes):
                 raise InvalidNamespaceSetError(
                     "Namespace {0.uri}: preferred prefix " \
                     '"{0.preferred_prefix}" not in prefixes ' \
@@ -838,11 +854,13 @@ def register_namespace(namespace):
     __ALL_NAMESPACES.add_namespace(namespace)
 
 
-def lookup_name(name):
-    return __ALL_NAMESPACES.preferred_prefix_for_namespace(name)
+def lookup_name(ns_uri):
+    """Return the preferred prefix for the input namespace uri."""
+    return __ALL_NAMESPACES.preferred_prefix_for_namespace(ns_uri)
 
 
 def lookup_prefix(prefix):
+    """Return the namespace uri that is mapped to the input prefix."""
     return __ALL_NAMESPACES.namespace_for_prefix(prefix)
 
 

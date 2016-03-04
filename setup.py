@@ -4,8 +4,6 @@
 # For license information, see the LICENSE.txt file
 
 from os.path import abspath, dirname, join
-
-
 from setuptools import setup, find_packages
 
 BASE_DIR = dirname(abspath(__file__))
@@ -23,7 +21,7 @@ def get_version():
 with open('README.rst') as f:
     readme = f.read()
 
-install_requires = ['lxml', 'python-dateutil']
+install_requires = ['lxml', 'python-dateutil', 'ordered-set']
 
 # Python 2.6 doesn't have WeakSet :(
 try:
