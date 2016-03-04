@@ -97,41 +97,6 @@ class InvalidNamespaceSetError(Exception):
         )
 
 
-class Validity(collections.Iterable):
-    """Instances of this class represent NamespaceSet validity test results.
-    They conceptually have two components: a True/False validity value
-    (where True means valid, False means invalid) and an associated message
-    string.  The message is really only useful when representing invalidity,
-    to help diagnose problems."""
-
-    def __init__(self, valid, msg):
-        self.valid = valid
-        self.msg = msg
-        # This will receive a tuple containing (valid, msg), lazily created
-        # on first access.  See __iter__().
-        self.tpl = None
-
-    def __nonzero__(self):
-        """Return non-zero if this object represents a valid result; zero if
-         invalid."""
-        return self.valid
-
-    __bool__ = __nonzero__
-
-    def __str__(self):
-        """Return the error message associated with this object."""
-        return self.msg
-
-    def __iter__(self):
-        """Returns an iterator over two values: first the validity value,
-        then the message.  This allows multi-variable assignment to work, e.g.
-        ``valid, msg = foo.is_valid()``."""
-        if self.tpl is None:
-            self.tpl = (self.valid, self.msg)
-
-        return iter(self.tpl)
-
-
 class _NamespaceInfo(object):
     """**This class is an implementation detail of :class:`NamespaceSet`.
     Others must not use this class.**
