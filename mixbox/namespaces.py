@@ -90,6 +90,13 @@ class NoPrefixesError(Exception):
         )
 
 
+class InvalidNamespaceSetError(Exception):
+    def __init__(self, msg):
+        super(InvalidNamespaceSetError, self).__init__(
+            "NamespaceSet is invalid: {0}".format(msg)
+        )
+
+
 class Validity(collections.Iterable):
     """Instances of this class represent NamespaceSet validity test results.
     They conceptually have two components: a True/False validity value
@@ -767,18 +774,21 @@ class NamespaceSet(object):
             else:
                 continue  # TODO (bworrell): Should this log/warn/do anything else?
 
-    def is_valid(self):  # TODO (bworrell): Change this to assert_valid() that raises Exceptions if invalid?
-        """For debugging; does some sanity checks on this set."""
+    def assert_valid(self):
+        """For debugging; does some sanity checks on this set.  Raises
+        InvalidNamespaceSetError if this namespace set is invalid.  Otherwise,
+        raises/returns nothing."""
+
         for ns_uri, ni in six.iteritems(self.__ns_uri_map):
             if not ni.uri:
-                return Validity(False,
+                raise InvalidNamespaceSetError(
                     "URI not set in _NamespaceInfo (id={0}):\n{1}".format(
                         id(ni), ni
                     )
                 )
 
             if ns_uri != ni.uri:
-                return Validity(False,
+                raise InvalidNamespaceSetError(
                     "URI mismatch in dict ({0}) and _NamespaceInfo ({1})".format(
                         ns_uri, ni.uri
                     )
@@ -786,7 +796,7 @@ class NamespaceSet(object):
 
             if ni.preferred_prefix is not None and \
                ni.preferred_prefix not in ni.prefixes:
-                return Validity(False,
+                raise InvalidNamespaceSetError(
                     "Namespace {0.uri}: preferred prefix " \
                     '"{0.preferred_prefix}" not in prefixes ' \
                     "{0.prefixes}".format(ni)
@@ -794,18 +804,18 @@ class NamespaceSet(object):
 
             for prefix in ni.prefixes:
                 if not prefix:
-                    return Validity(False,
+                    raise InvalidNamespaceSetError(
                         "Namespace {0.uri}: empty value in prefix " \
                         "set: {0.prefixes}".format(ni)
                     )
                 other_ni = self.__prefix_map.get(prefix)
                 if other_ni is None:
-                    return Validity(False,
+                    raise InvalidNamespaceSetError(
                         'Namespace {0.uri}: prefix "{1}" not in ' \
                         'prefix map'.format(ni, prefix)
                     )
                 if other_ni is not ni:
-                    return Validity(False,
+                    raise InvalidNamespaceSetError(
                         'Namespace {0.uri}: prefix "{1}" maps to ' \
                         'wrong _NamespaceInfo (id={2}, uri={3.uri})'.format(
                             ni, prefix, id(other_ni), other_ni
@@ -815,9 +825,17 @@ class NamespaceSet(object):
         if None in self.__prefix_map:
             # None can be a preferred prefix, but should not be in the
             # prefix map.
-            return Validity(False, "None is in prefix map!")
+            raise InvalidNamespaceSetError("None is in prefix map!")
 
-        return Validity(True, "Ok")
+    def is_valid(self):
+        """Does some sanity checks on this set.  Returns True if the set is
+        valid, False otherwise."""
+        try:
+            self.assert_valid()
+        except InvalidNamespaceSetError:
+            return False
+
+        return True
 
     def __len__(self):
         """Return the number of namespaces in this set."""
