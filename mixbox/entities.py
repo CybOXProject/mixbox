@@ -128,7 +128,7 @@ class EntityFactory(object):
             return None
 
     @classmethod
-    def from_dict(cls, cls_dict):
+    def from_dict(cls, cls_dict, fallback_xsi_type=None):
         """Parse the dictionary and return an Entity instance.
 
         This will attempt to extract type information from the input
@@ -137,17 +137,26 @@ class EntityFactory(object):
 
         Args:
             cls_dict: A dictionary representation of an Entity object.
+            fallback_xsi_type: An xsi_type to use for string input, which doesn't have properties
 
         Returns:
             An Entity instance.
         """
         if not cls_dict:
             return None
+        
+        import cybox.common
+        if isinstance(cls_dict, cybox.common.VocabString):
+            pass
 
         if isinstance(cls_dict, str) or isinstance(cls_dict, unicode):
-            return cls_dict
+            if not getattr(cls, "_convert_strings", False):
+                return cls_dict
 
-        typekey = cls.dictkey(cls_dict)
+        try:
+            typekey = cls.dictkey(cls_dict)
+        except TypeError:
+            typekey = fallback_xsi_type
         klass   = cls.entity_class(typekey)
         return klass.from_dict(cls_dict)
 
@@ -323,7 +332,14 @@ class Entity(object):
         entity = cls()
 
         for field in cls.typed_fields():
-            val = getattr(cls_obj, field.name)
+            try:
+                val = getattr(cls_obj, field.name)
+            except:
+                # HACK: if the cls_obj is not an instance of cls,
+                # only copy fields that exist on cls
+                # (this only happens with "Base" binding types that map onto
+                #  non-base API types, like BaseIndicatorType => Indicator)
+                continue
 
             # Get the class that will perform the from_obj() call and
             # transform the generateDS binding object into an Entity.
@@ -365,7 +381,6 @@ class Entity(object):
             # Get the class that will perform the from_obj() call and
             # transform the generateDS binding object into an Entity.
             transformer = field.transformer
-
             if transformer:
                 if field.multiple:
                     if val is not None:
@@ -666,7 +681,14 @@ class EntityList(collections.MutableSequence, Entity):
 
         entitylist  = cls()
         transformer = cls._multiple_field().transformer
-        entitylist.extend(transformer.from_dict(x) for x in seq)
+        fallback_xsi_type = getattr(cls._multiple_field().type_,"_XSI_TYPE", None)
+        try:
+            transformed_list = [transformer.from_dict(x, fallback_xsi_type)
+                                for x in seq]
+        except TypeError:
+            transformed_list = [transformer.from_dict(x)
+                                for x in seq]
+        entitylist.extend(transformed_list)
 
         return entitylist
 
