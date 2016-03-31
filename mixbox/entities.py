@@ -149,7 +149,7 @@ class EntityFactory(object):
         if isinstance(cls_dict, cybox.common.VocabString):
             pass
 
-        if isinstance(cls_dict, str) or isinstance(cls_dict, unicode):
+        if isinstance(cls_dict, six.string_types):
             if not getattr(cls, "_convert_strings", False):
                 return cls_dict
 
