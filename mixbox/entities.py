@@ -269,7 +269,10 @@ class Entity(object):
         entity_obj = self._binding_class()
 
         for field, val in six.iteritems(self._fields):
-            if field.multiple:
+            # EntityLists with no list items should be dropped
+            if isinstance(val, EntityList) and len(val)==0:
+                val = None
+            elif field.multiple:
                 if val:
                     val = [_objectify(field, x, ns_info) for x in val]
                 else:
