@@ -343,10 +343,11 @@ def quote_python(inStr):
 
 
 def get_all_text_(node):
-    if node.text is not None:
-        text = node.text
-    else:
-        text = ''
+    if node.text is None:
+        return None
+
+    text = node.text
+
     for child in node:
         if child.tail is not None:
             text += child.tail

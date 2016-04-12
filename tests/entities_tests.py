@@ -2,12 +2,12 @@
 # See LICENSE.txt for complete terms.
 
 import unittest
+import copy
 
 from mixbox.entities import Entity, EntityList, NamespaceCollector
 from mixbox import fields
 from mixbox.vendor import six
 import mixbox.namespaces
-
 
 class TestEntity(unittest.TestCase):
 
@@ -41,6 +41,27 @@ class TestEntity(unittest.TestCase):
         self.assertEqual(["a"], s_dict['multiple'])
 
 
+    def test_deepcopy(self):
+        """Test that copy.deepcopy() doesn't blow up on simple cases.
+
+        See Also:
+            https://github.com/CybOXProject/mixbox/issues/19
+        """
+        class MockEntity(Entity):
+            foo = fields.TypedField("foo")
+            bar = fields.TypedField("bar")
+
+        eorig = MockEntity()
+        eorig.foo = "FOO"
+        eorig.bar = "BAR"
+
+        ecopy = copy.deepcopy(eorig)
+
+        # Test that the values copied and that value retrieval works.
+        self.assertEqual(ecopy.foo, eorig.foo)
+        self.assertEqual(ecopy.bar, eorig.bar)
+
+
 class TestEntityList(unittest.TestCase):
 
     def test_remove(self):
@@ -56,7 +77,7 @@ class TestEntityList(unittest.TestCase):
                 return self.name
 
         class FooList(EntityList):
-            _contained_type = Foo
+            foos = fields.TypedField("foo", type_=Foo, multiple=True)
 
         foo1 = Foo("Alpha")
         foo2 = Foo("Beta")

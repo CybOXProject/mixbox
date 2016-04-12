@@ -593,7 +593,7 @@ class NamespaceSet(object):
     def get_schemaloc_string(self, ns_uris=None, sort=False, delim="\n"):
         """Constructs and returns a schemalocation attribute.  If no
         namespaces in this set have any schema locations defined, returns
-        None.
+        an empty string.
 
         Args:
             ns_uris (iterable): The namespaces to include in the constructed
@@ -622,7 +622,7 @@ class NamespaceSet(object):
                 schemalocs.append("{0.uri} {0.schema_location}".format(ni))
 
         if not schemalocs:
-            return None
+            return ""
 
         return 'xsi:schemaLocation="{0}"'.format(delim.join(schemalocs))
 
