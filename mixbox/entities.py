@@ -15,12 +15,16 @@ from .vendor import six
 # Note: Some imports moved to the bottom of this module to resolve circular
 # import issues.
 
+
 def _objectify(field, value, ns_info):
     """Make `value` suitable for a binding object.
 
     If `value` is an Entity, call to_obj() on it. Otherwise, pass it
     off to the TypedField for an appropriate value.
     """
+    if getattr(field.type_, "_treat_none_as_empty_list", False):
+        return []
+
     if value is None:
         return None
     elif field.type_:
