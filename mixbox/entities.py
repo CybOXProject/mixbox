@@ -222,6 +222,7 @@ class Entity(object):
         except KeyError:
             # No typed_fields set on this Entity yet. Find them and store
             # them in the _typed_fields class attribute.
+            from . import fields
             typed_fields = tuple(fields.iterfields(cls))
             cls._typed_fields_with_attrnames = typed_fields
         return typed_fields
@@ -577,6 +578,7 @@ class EntityList(collections.MutableSequence, Entity):
             # values, so we check the class __dict__ explicitly.
             return klassdict["_entitylist_multifield"][0]
         except (KeyError, IndexError, TypeError):
+            from . import fields
             multifield_tuple = tuple(fields.find(cls, multiple=True))
             assert len(multifield_tuple) == 1
 
@@ -899,5 +901,3 @@ class NamespaceCollector(object):
         if hasattr(entity, "__input_schemalocations__"):
             self._input_schemalocs.update(entity.__input_schemalocations__)
 
-# Resolve circular imports
-from . import fields
