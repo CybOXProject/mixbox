@@ -22,7 +22,8 @@ def _objectify(field, value, ns_info):
     If `value` is an Entity, call to_obj() on it. Otherwise, pass it
     off to the TypedField for an appropriate value.
     """
-    if getattr(field.type_, "_treat_none_as_empty_list", False):
+    if (getattr(field.type_, "_treat_none_as_empty_list", False) and
+            value is None):
         return []
 
     if value is None:
