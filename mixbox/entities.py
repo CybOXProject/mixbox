@@ -15,12 +15,17 @@ from .vendor import six
 # Note: Some imports moved to the bottom of this module to resolve circular
 # import issues.
 
+
 def _objectify(field, value, ns_info):
     """Make `value` suitable for a binding object.
 
     If `value` is an Entity, call to_obj() on it. Otherwise, pass it
     off to the TypedField for an appropriate value.
     """
+    if (getattr(field.type_, "_treat_none_as_empty_list", False) and
+            value is None):
+        return []
+
     if value is None:
         return None
     elif field.type_:
@@ -303,7 +308,6 @@ class Entity(object):
             Python dict with keys set from this Entity.
         """
         entity_dict = {}
-
 
         for field, val in six.iteritems(self._fields):
             if field.multiple:
@@ -904,4 +908,3 @@ class NamespaceCollector(object):
         # from some external source.
         if hasattr(entity, "__input_schemalocations__"):
             self._input_schemalocs.update(entity.__input_schemalocations__)
-
