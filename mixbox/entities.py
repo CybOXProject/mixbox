@@ -269,6 +269,10 @@ class Entity(object):
         if ns_info:
             ns_info.collect(self)
 
+        # null behavior for classes that inherit from Entity but do not have _binding_class
+        if not hasattr(self, "_binding_class"):
+            return None
+
         entity_obj = self._binding_class()
 
         for field, val in six.iteritems(self._fields):
