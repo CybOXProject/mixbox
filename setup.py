@@ -32,13 +32,6 @@ except ImportError:
     install_requires.append('weakrefset')
 
 
-# WeakMethod was introduced in Python 3.4
-try:
-    from weakref import WeakMethod
-except ImportError:
-    install_requires.append('weakrefmethod')
-
-
 extras_require = {
     'docs': [
         'Sphinx==1.3.1',
