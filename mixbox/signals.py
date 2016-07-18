@@ -18,7 +18,7 @@ from .vendor import six
 try:
     from weakref import WeakMethod
 except ImportError:
-    from weakrefmethod import WeakMethod
+    from .vendor.weakrefmethod import WeakMethod
 
 
 # Module-level logger
