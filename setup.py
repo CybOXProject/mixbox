@@ -36,7 +36,7 @@ except ImportError:
 try:
     from weakref import WeakMethod
 except ImportError:
-    install_requires.append('weakrefmethod')
+    install_requires.append('weakrefmethod>=1.0.3')
 
 
 extras_require = {
