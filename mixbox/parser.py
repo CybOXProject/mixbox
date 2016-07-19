@@ -6,6 +6,7 @@ from distutils.version import StrictVersion
 
 from .exceptions import ignored
 from .xml import get_etree_root, get_etree, get_schemaloc_pairs
+from .vendor.six import iteritems
 
 
 class UnknownVersionError(Exception):
@@ -186,7 +187,7 @@ class EntityParser(object):
         entity = self.get_entity_class(xml_root_node.tag).from_obj(entity_obj)
 
         # Save the parsed nsmap and schemalocations onto the parsed Entity
-        entity.__input_namespaces__ = dict(xml_root_node.nsmap.iteritems())
+        entity.__input_namespaces__ = dict(iteritems(xml_root_node.nsmap))
         with ignored(KeyError):
             pairs = get_schemaloc_pairs(xml_root_node)
             entity.__input_schemalocations__ = dict(pairs)

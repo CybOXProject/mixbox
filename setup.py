@@ -27,7 +27,8 @@ install_requires = ['lxml', 'python-dateutil', 'ordered-set']
 # Some required modules/packages don't exist in all versions of Python.
 # Luckily, backports exist in PyPI.
 backports = {
-    "weakrefmethod": "from weakref import WeakMethod",
+    # WeakMethod was introduced in Python 3.4
+    "weakrefmethod>=1.0.3": "from weakref import WeakMethod",
     "importlib": "import importlib",
     "weakrefset": "from weakref import WeakSet"
 }
@@ -37,7 +38,6 @@ for package, importstmt in backports.items():
         exec(importstmt)
     except ImportError:
         install_requires.append(package)
-
 
 extras_require = {
     'docs': [
