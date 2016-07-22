@@ -207,7 +207,7 @@ class TestNamespaceSet(unittest.TestCase):
         ns.add_prefix("g:h:i", "ghi3")
 
         uri_pfx_map = ns.get_uri_prefix_map()
-        self.assertIn(uri_pfx_map["g:h:i"], ("ghi1", "ghi2", "ghi3"))
+        self.assertTrue(uri_pfx_map["g:h:i"] in ("ghi1", "ghi2", "ghi3"))
 
         pfx_uri_map = ns.get_prefix_uri_map()
         self.assertTrue("ghi1" in pfx_uri_map or
@@ -301,7 +301,7 @@ class TestNamespaceSet(unittest.TestCase):
         # a:b:c.
         xmlns_string = ns.get_xmlns_string()
         m = self.XMLNS_RE_NO_CAP.match(xmlns_string)
-        self.assertIsNotNone(m, "Invalid XML namespace declaration format")
+        self.assertNotEqual(m, None, "Invalid XML namespace declaration format")
 
         ns2 = self.__get_contents_of_xmlns_string(xmlns_string)
         self.assertEqual(len(ns2), 3)
@@ -316,12 +316,12 @@ class TestNamespaceSet(unittest.TestCase):
 
         self.assertEqual(ns2.preferred_prefix_for_namespace("a:b:c"), "abc")
         self.assertEqual(ns2.preferred_prefix_for_namespace("d:e:f"), "def")
-        self.assertIsNone(ns2.preferred_prefix_for_namespace("g:h:i"))
+        self.assertEqual(ns2.preferred_prefix_for_namespace("g:h:i"), None)
 
         # Now, gimme all the prefixes
         xmlns_string = ns.get_xmlns_string(preferred_prefixes_only=False)
         m = self.XMLNS_RE_NO_CAP.match(xmlns_string)
-        self.assertIsNotNone(m, "Invalid XML namespace declaration format: " +
+        self.assertNotEqual(m, None, "Invalid XML namespace declaration format: " +
                              xmlns_string)
 
         ns2 = self.__get_contents_of_xmlns_string(xmlns_string)
@@ -329,7 +329,7 @@ class TestNamespaceSet(unittest.TestCase):
 
         schemaloc_string = ns.get_schemaloc_string()
         m = self.SCHEMALOC_RE_NO_CAP.match(schemaloc_string)
-        self.assertIsNotNone(m,
+        self.assertNotEqual(m, None,
                              "Invalid XML schema location declaration format")
         schemaloc_dict = self.__get_schema_location_pairs(schemaloc_string)
 
@@ -377,7 +377,7 @@ class TestNamespaceSet(unittest.TestCase):
         ns.import_from(imported_ns2, True)
 
         self.assertEqual(ns.get_prefixes("a:b:c"), set(["abc2"]))
-        self.assertIsNone(ns.get_schema_location("a:b:c"))
+        self.assertEqual(ns.get_schema_location("a:b:c"), None)
 
         imported_ns3 = NamespaceSet()
         imported_ns3.add_namespace_uri("g:h:i", "def")
