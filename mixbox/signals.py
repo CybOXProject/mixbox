@@ -39,11 +39,17 @@ def __is_dead(ref):
 
 
 def __make_id(receiver):
-    """Generate an identifier for a signal receiver function/method.
+    """Generate an identifier for a callable signal receiver.
 
     This is used when disconnecting receivers, where we need to correctly
     establish equivalence between the input receiver and the receivers assigned
     to a signal.
+
+    Args:
+        receiver: A callable object.
+
+    Returns:
+        An identifier for the receiver.
     """
     if __is_bound_method(receiver):
         return (id(receiver.__func__), id(receiver.__self__))
@@ -72,6 +78,9 @@ def __live_receivers(signal):
 
     Args:
         signal: A signal name.
+
+    Returns:
+        A list of callable receivers for the input signal.
     """
     with __lock:
         __purge()
@@ -94,8 +103,8 @@ def __is_bound_method(method):
     return six.get_method_self(method) is not None
 
 
-def __check_receiver(func):
-    """Check that the `func` is an acceptable signal receiver.
+def __check_receiver(receiver):
+    """Check that the `receiver` is an acceptable signal receiver.
 
     Signal receivers must be one of the following:
 
@@ -107,7 +116,7 @@ def __check_receiver(func):
     Raises:
         TypeError: If `func` is not an appropriate signal receiver.
     """
-    if six.callable(func):
+    if six.callable(receiver):
         return
 
     error = ("Signal receivers must be functions, callable objects, or "
@@ -115,9 +124,16 @@ def __check_receiver(func):
     raise TypeError(error)
 
 
-def connect(signal_id, receiver):
-    """Register `receiver` method/function as a receiver for the signal
-    `signal_id`."""
+def connect(signal, receiver):
+    """Register `receiver` method/function as a receiver for the `signal`.
+
+    When the signal is emitted, this receiver will be invoked along with
+    all other associated signals.
+
+    Args:
+        signal: A signal identifier (e.g., a signal name)
+        receiver: A callable object to connect to the signal.
+    """
     __check_receiver(receiver)
 
     if __is_bound_method(receiver):
@@ -127,56 +143,72 @@ def connect(signal_id, receiver):
 
     with __lock:
         __purge()
-        __receivers[signal_id].append(ref(receiver))
+        __receivers[signal].append(ref(receiver))
 
 
-def disconnect(signal_id, receiver):
+def disconnect(signal, receiver):
     """Disconnect the receiver `func` from the signal, identified by
     `signal_id`.
 
     Args:
-        signal_id: The signal identifier
-        func: The receiver to disconnect
+        signal: The signal identifier.
+        receiver: The callable receiver to disconnect.
+
+    Returns:
+        True if the receiver was successfully disconnected. False otherwise.
     """
-    disconnected = False
     inputkey = __make_id(receiver)
 
     with __lock:
         __purge()
-        receivers = __receivers.get(signal_id)
+        receivers = __receivers.get(signal)
 
         for idx in six.moves.range(len(receivers)):
             connected = receivers[idx]()
 
-            if inputkey == __make_id(connected):
-                disconnected = True
-                del receivers[idx]
-                break
+            if inputkey != __make_id(connected):
+                continue
 
-    return disconnected
+            del receivers[idx]
+            return True  # receiver successfully disconnected!
+
+    return False
 
 
-def receiver(signal_id):
+def receiver(signal):
     """Function decorator which registers the wrapped function as a signal
     receiver for the signal `signal_name`.
 
     Warning:
         This will not work with unbound instance methods.
+
+    Args:
+        signal: A signal identifier (e.g., a name).
     """
     def decorator(func):
-        connect(signal_id, func)  # register the signal receiver
+        connect(signal, func)  # register the signal receiver
         return func
     return decorator
 
 
-def emit(signal_id, *args, **kwargs):
+def emit(signal, *args, **kwargs):
     """Emit a signal by serially calling each registered signal receiver for
-    the signal `signal_name`.
+    the `signal`.
+
+    Note:
+        The receiver must accept the *args and/or **kwargs that have been
+        passed to it. There expected parameters are not dictated by
+        mixbox.
+        
+    Args:
+        signal: A signal identifier or name.
+        *args: A variable-length argument list to pass to the receiver.
+        **kwargs: Keyword-arguments to pass to the receiver.
     """
-    if signal_id not in __receivers:
+    if signal not in __receivers:
         return
 
-    receivers = __live_receivers(signal_id)
+    receivers = __live_receivers(signal)
 
     for func in receivers:
         func(*args, **kwargs)
