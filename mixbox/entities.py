@@ -257,6 +257,9 @@ class Entity(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        return hash((g.__get__(self) for g in [f for f in self.typed_fields() if f.comparable]))
+
     def to_obj(self, ns_info=None):
         """Convert to a GenerateDS binding object.
 
