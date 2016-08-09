@@ -49,3 +49,4 @@ Releasing
     $ rm dist/*
     $ python setup.py sdist --formats=gztar,zip
     $ twine upload dist/*
+    $ git push --tag
