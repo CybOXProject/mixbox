@@ -11,9 +11,9 @@ A library of common code leveraged by python-cybox, python-maec, and python-stix
 .. |landscape.io badge| image:: https://landscape.io/github/CybOXProject/mixbox/master/landscape.svg?style=flat
    :target: https://landscape.io/github/CybOXProject/mixbox/master
    :alt: Code Health
-.. |version badge| image:: https://img.shields.io/pypi/v/mixbox.svg?maxAge=2592000
+.. |version badge| image:: https://img.shields.io/pypi/v/mixbox.svg?maxAge=3600
    :target: https://pypi.python.org/pypi/mixbox/
-.. |downloads badge| image:: https://img.shields.io/pypi/dm/mixbox.svg?maxAge=2592000
+.. |downloads badge| image:: https://img.shields.io/pypi/dm/mixbox.svg?maxAge=3600
    :target: https://pypi.python.org/pypi/mixbox/
 
 
