@@ -361,6 +361,9 @@ class DateTimeField(TypedField):
     def dict_value(self, value):
         return serialize_datetime(value)
 
+    def binding_value(self, value):
+        return serialize_datetime(value)
+
 
 class DateField(TypedField):
     def _clean(self, value):
@@ -368,6 +371,9 @@ class DateField(TypedField):
 
     def dict_value(self, value):
         return serialize_date(value)
+
+    def binding_value(self, value):
+        return serialize_datetime(value)
 
 
 class CDATAField(TypedField):
