@@ -373,7 +373,7 @@ class DateField(TypedField):
         return serialize_date(value)
 
     def binding_value(self, value):
-        return serialize_datetime(value)
+        return serialize_date(value)
 
 
 class CDATAField(TypedField):

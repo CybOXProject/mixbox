@@ -73,10 +73,10 @@ def serialize_date(value):
     """
     if not value:
         return None
-    elif isinstance(value, datetime.date):
-        return value.isoformat()
     elif isinstance(value, datetime.datetime):
         return value.date().isoformat()
+    elif isinstance(value, datetime.date):
+        return value.isoformat()
     else:
         return parse_date(value).isoformat()
 
