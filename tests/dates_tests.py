@@ -15,6 +15,12 @@ class DatesTests(unittest.TestCase):
         dstr = "2015-04-01"
         parsed = dates.parse_date(dstr)
         self.assertEqual(dstr, parsed.isoformat())
+        
+    def test_serialize_datetime_as_date(self):
+        now = dates.now()
+        self.assertTrue(isinstance(now, datetime.datetime))
+        nowstr = dates.serialize_date(now)
+        self.assertEquals(nowstr, now.date().isoformat())
 
     def test_parse_datetime(self):
         dtstr = '2015-04-02T16:44:30.423149+00:00'
