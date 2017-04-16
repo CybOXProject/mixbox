@@ -39,6 +39,13 @@ for package, importstmt in backports.items():
     except ImportError:
         install_requires.append(package)
 
+# Python 2.6 doesn't have WeakSet :(
+try:
+    from weakref import WeakSet
+except ImportError:
+    install_requires.append('weakrefset')
+
+
 extras_require = {
     'docs': [
         'Sphinx==1.3.1',
