@@ -257,6 +257,23 @@ class Entity(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        # Get all comparable TypedFields
+        typedfields = [f for f in self.typed_fields() if f.comparable]
+
+        fields = []
+        values = []
+        for field in typedfields:
+            value = field.__get__(self)
+            fields.append(field.key_name)
+            # Lists are unhashable, so convert them to tuples
+            if type(value) is list:
+                values.append(tuple(value))
+            else:
+                values.append(value)
+
+        return hash(tuple(fields + values))
+
     def to_obj(self, ns_info=None):
         """Convert to a GenerateDS binding object.
 

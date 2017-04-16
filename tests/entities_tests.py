@@ -62,6 +62,53 @@ class TestEntity(unittest.TestCase):
         self.assertEqual(ecopy.bar, eorig.bar)
 
 
+    def test_equals_and_hash(self):
+
+        class Mock(object):
+            pass
+
+        class SomeEntity(Entity):
+            _binding_class = Mock
+
+            single = fields.TypedField("Single")
+            multiple = fields.TypedField("Multiple", multiple=True)
+
+        class AnotherEntity(Entity):
+            _binding_class = Mock
+
+            producer = fields.TypedField("Producer")
+            observable = fields.TypedField("Observable", multiple=True)
+
+
+        s1 = SomeEntity()
+        s1.single = "a"
+        s1.multiple = "a"
+
+        s2 = SomeEntity()
+        s2.single = "b"
+        s2.multiple = "b"
+
+        s3 = SomeEntity()
+        s3.single = "a"
+        s3.multiple = "a"
+
+        s4 = AnotherEntity()
+        s4.producer = "a"
+        s4.observable = "a"
+
+        self.assertFalse(s1 is s3)
+        self.assertEqual(s1, s3)
+        self.assertEqual(hash(s1), hash(s3))
+
+        self.assertFalse(s1 is s2)
+        self.assertNotEqual(s1, s2)
+        self.assertNotEqual(hash(s1), hash(s2))
+
+        self.assertFalse(s1 is s4)
+        self.assertNotEqual(s1, s4)
+        self.assertNotEqual(hash(s1), hash(s4))
+
+
 class TestEntityList(unittest.TestCase):
 
     def test_remove(self):
