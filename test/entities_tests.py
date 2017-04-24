@@ -40,7 +40,6 @@ class TestEntity(unittest.TestCase):
         self.assertEqual("a", s_dict['single'])
         self.assertEqual(["a"], s_dict['multiple'])
 
-
     def test_deepcopy(self):
         """Test that copy.deepcopy() doesn't blow up on simple cases.
 
@@ -60,6 +59,29 @@ class TestEntity(unittest.TestCase):
         # Test that the values copied and that value retrieval works.
         self.assertEqual(ecopy.foo, eorig.foo)
         self.assertEqual(ecopy.bar, eorig.bar)
+
+    def test_hash_and_equality(self):
+        """Test for hashing and equality of Entity"""
+        class Foo(Entity):
+            name = fields.TypedField("Name", None)
+
+            def __init__(self, name):
+                super(Foo, self).__init__()
+                self.name = name
+
+            def __str__(self):
+                return self.name
+
+        foo1 = Foo("Alpha")
+        foo2 = Foo("Beta")
+
+        self.assertNotEqual(hash(foo1), hash(foo2))
+        self.assertNotEqual(foo1, foo2)
+
+        foo3 = Foo("Alpha")
+
+        self.assertEqual(hash(foo1), hash(foo3))
+        self.assertEqual(foo1, foo3)
 
 
 class TestEntityList(unittest.TestCase):
