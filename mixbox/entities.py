@@ -143,7 +143,8 @@ class EntityFactory(object):
 
         Args:
             cls_dict: A dictionary representation of an Entity object.
-            fallback_xsi_type: An xsi_type to use for string input, which doesn't have properties
+            fallback_xsi_type: An xsi_type to use for string input, which
+            doesn't have properties
 
         Returns:
             An Entity instance.
@@ -248,11 +249,25 @@ class Entity(object):
         typedfields = [f for f in self.typed_fields() if f.comparable]
 
         # If No comparable TypedFields are found, return False so we don't
-        # inadvertantly say they are equal.
+        # inadvertently say they are equal.
         if not typedfields:
             return False
 
         return all(f.__get__(self) == f.__get__(other) for f in typedfields)
+
+    def __hash__(self):
+        # The hash of the object is: all TypedFields, all TypedField values and
+        # the class. - EV
+        typedfield_values = tuple()
+        klass = (self.__class__,)
+
+        for f in self.typed_fields():
+            if isinstance(f.__get__(self), list):
+                typedfield_values += tuple(f.__get__(self))
+            else:
+                typedfield_values += (f.__get__(self),)
+
+        return hash(self.typed_fields() + typedfield_values + klass)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -269,7 +284,8 @@ class Entity(object):
         if ns_info:
             ns_info.collect(self)
 
-        # null behavior for classes that inherit from Entity but do not have _binding_class
+        # null behavior for classes that inherit from Entity but do not
+        # have _binding_class
         if not hasattr(self, "_binding_class"):
             return None
 
@@ -277,7 +293,7 @@ class Entity(object):
 
         for field, val in six.iteritems(self._fields):
             # EntityLists with no list items should be dropped
-            if isinstance(val, EntityList) and len(val)==0:
+            if isinstance(val, EntityList) and len(val) == 0:
                 val = None
             elif field.multiple:
                 if val:
@@ -507,7 +523,6 @@ class EntityList(collections.MutableSequence, Entity):
     # Don't try to cast list types (yet)
     _try_cast = False
 
-
     def __init__(self, *args):
         super(EntityList, self).__init__()
         assert self._multiple_field()
@@ -591,7 +606,7 @@ class EntityList(collections.MutableSequence, Entity):
             assert len(multifield_tuple) == 1
 
             # Make sure that the multiple field actually has an Entity type.
-            multifield  = multifield_tuple[0]
+            multifield = multifield_tuple[0]
             assert issubclass(multifield.type_, Entity)
 
             # Store aside the multiple field. We wrap it in a tuple because
@@ -633,7 +648,8 @@ class EntityList(collections.MutableSequence, Entity):
 
         entitylist  = cls()
         transformer = cls._multiple_field().transformer
-        fallback_xsi_type = getattr(cls._multiple_field().type_,"_XSI_TYPE", None)
+        fallback_xsi_type = getattr(cls._multiple_field().type_,
+                                    "_XSI_TYPE", None)
         try:
             transformed_list = [transformer.from_dict(x, fallback_xsi_type)
                                 for x in seq]
