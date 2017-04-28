@@ -39,17 +39,6 @@ for package, importstmt in backports.items():
     except ImportError:
         install_requires.append(package)
 
-extras_require = {
-    'docs': [
-        'Sphinx==1.3.1',
-        'sphinx_rtd_theme==0.1.8',
-    ],
-    'test': [
-        "nose==1.3.0",
-        "tox==1.6.1"
-    ],
-}
-
 setup(
     name="mixbox",
     version=get_version(),
@@ -60,7 +49,6 @@ setup(
     url="http://github.com/CybOXProject/mixbox",
     packages=find_packages(),
     install_requires=install_requires,
-    extras_require=extras_require,
     classifiers=[
         "Programming Language :: Python",
         "Development Status :: 2 - Pre-Alpha",
