@@ -46,7 +46,7 @@ Releasing
 .. code:: bash
 
     $ bumpversion patch
+    $ git push origin master --tags
     $ rm dist/*
-    $ python setup.py sdist --formats=gztar,zip
+    $ python setup.py sdist bdist_wheel
     $ twine upload dist/*
-    $ git push --tag
