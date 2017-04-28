@@ -1,26 +1,15 @@
 language: python
 python:
-  - 3.6
-
-env:
-  - TOXENV=py26
-  - TOXENV=py27
-  - TOXENV=py33
-  - TOXENV=py34
-  - TOXENV=py35
-  - TOXENV=py36
-  - TOXENV=rhel6
-
+  - "2.6"
+  - "2.7"
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  - "3.6"
 install:
-  - pip install -U tox
-
+  - pip install tox-travis
 script:
   - tox
-
-branches:
-  only:
-    - master
-
 notifications:
   email:
     - gback@mitre.org
