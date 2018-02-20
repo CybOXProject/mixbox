@@ -3,18 +3,17 @@ mixbox
 
 A library of common code leveraged by python-cybox, python-maec, and python-stix.
 
-|travis badge| |landscape.io badge| |version badge| |downloads badge|
+|travis_badge| |landscape_io_badge| |version_badge|
 
-.. |travis badge| image:: https://api.travis-ci.org/CybOXProject/mixbox.svg?branch=master
+.. |travis_badge| image:: https://api.travis-ci.org/CybOXProject/mixbox.svg?branch=master
    :target: https://travis-ci.org/CybOXProject/mixbox
    :alt: Build Status
-.. |landscape.io badge| image:: https://landscape.io/github/CybOXProject/mixbox/master/landscape.svg?style=flat
+.. |landscape_io_badge| image:: https://landscape.io/github/CybOXProject/mixbox/master/landscape.svg?style=flat
    :target: https://landscape.io/github/CybOXProject/mixbox/master
    :alt: Code Health
-.. |version badge| image:: https://img.shields.io/pypi/v/mixbox.svg?maxAge=3600
+.. |version_badge| image:: https://img.shields.io/pypi/v/mixbox.svg?maxAge=3600
    :target: https://pypi.python.org/pypi/mixbox/
-.. |downloads badge| image:: https://img.shields.io/pypi/dm/mixbox.svg?maxAge=3600
-   :target: https://pypi.python.org/pypi/mixbox/
+   :alt: Version
 
 
 Developing
