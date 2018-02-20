@@ -423,7 +423,7 @@ class Entity(object):
         return entity
 
     def to_xml(self, include_namespaces=True, namespace_dict=None,
-               pretty=True, encoding='utf-8'):
+               pretty=True, encoding="utf-8"):
         """Serializes a :class:`Entity` instance to an XML string.
 
         The default character encoding is ``utf-8`` and can be set via the
@@ -466,10 +466,16 @@ class Entity(object):
                 pretty_print=pretty
             )
 
-        s = six.text_type(sio.getvalue()).strip()
+        # Ensure that the StringIO buffer is unicode
+        s = six.text_type(sio.getvalue())
 
         if encoding:
-            return s.encode(encoding)
+            s = s.encode(encoding=encoding)
+            if six.PY3:
+                # If Python 3, return str representation instead of bytes since
+                # it is already unicode.
+                return s.decode(encoding=encoding)  # Go back to str
+            return s
 
         return s
 
@@ -482,7 +488,7 @@ class Entity(object):
         """Parse a JSON string and build an entity."""
         try:
             d = json.load(json_doc)
-        except AttributeError: # catch the read() error
+        except AttributeError:  # catch the read() error
             d = json.loads(json_doc)
 
         return cls.from_dict(d)
