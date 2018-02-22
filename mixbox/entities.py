@@ -427,8 +427,14 @@ class Entity(object):
         """Serializes a :class:`Entity` instance to an XML string.
 
         The default character encoding is ``utf-8`` and can be set via the
-        `encoding` parameter. If `encoding` is ``None``, a unicode string
-        is returned.
+        `encoding` parameter.
+
+        If `encoding` is ``None``, a unicode string is returned. That is, a
+        :class:`unicode` in Python 2 and a :class:`str` in Python 3.
+
+        Notes:
+            If you need to print a byte string in Python 3, you will need to
+            decode it using using the :class:`str`.
 
         Args:
             include_namespaces (bool): whether to include xmlns and
@@ -438,12 +444,14 @@ class Entity(object):
                 prefixes
             pretty (bool): whether to produce readable (``True``) or compact
                 (``False``) output. Defaults to ``True``.
-            encoding: The output character encoding. Default is ``utf-8``. If
-                `encoding` is set to ``None``, a unicode string is returned.
+            encoding: The output character encoding. Default character encoding
+                is ``utf-8``.
 
         Returns:
-            An XML string for this
-            :class:`Entity` instance. Default character encoding is ``utf-8``.
+            A byte string containing the XML representation for this :class:`Entity`
+            instance if an encoding was provided. If encoding is set to
+            ``None`` a unicode string containing the XML representation will be
+            returned.
 
         """
         namespace_def = ""
@@ -470,12 +478,7 @@ class Entity(object):
         s = six.text_type(sio.getvalue())
 
         if encoding:
-            s = s.encode(encoding=encoding)
-            if six.PY3:
-                # If Python 3, return str representation instead of bytes since
-                # it is already unicode.
-                return s.decode(encoding=encoding)  # Go back to str
-            return s
+            return s.encode(encoding)
 
         return s
 
