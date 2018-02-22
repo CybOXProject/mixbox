@@ -423,12 +423,18 @@ class Entity(object):
         return entity
 
     def to_xml(self, include_namespaces=True, namespace_dict=None,
-               pretty=True, encoding='utf-8'):
+               pretty=True, encoding="utf-8"):
         """Serializes a :class:`Entity` instance to an XML string.
 
         The default character encoding is ``utf-8`` and can be set via the
-        `encoding` parameter. If `encoding` is ``None``, a unicode string
-        is returned.
+        `encoding` parameter.
+
+        If `encoding` is ``None``, a unicode string is returned. That is, a
+        :class:`unicode` in Python 2 and a :class:`str` in Python 3.
+
+        Notes:
+            If you need to print a byte string in Python 3, you will need to
+            decode it using using the :class:`str`.
 
         Args:
             include_namespaces (bool): whether to include xmlns and
@@ -438,12 +444,14 @@ class Entity(object):
                 prefixes
             pretty (bool): whether to produce readable (``True``) or compact
                 (``False``) output. Defaults to ``True``.
-            encoding: The output character encoding. Default is ``utf-8``. If
-                `encoding` is set to ``None``, a unicode string is returned.
+            encoding: The output character encoding. Default character encoding
+                is ``utf-8``.
 
         Returns:
-            An XML string for this
-            :class:`Entity` instance. Default character encoding is ``utf-8``.
+            A byte string containing the XML representation for this :class:`Entity`
+            instance if an encoding was provided. If encoding is set to
+            ``None`` a unicode string containing the XML representation will be
+            returned.
 
         """
         namespace_def = ""
@@ -466,7 +474,8 @@ class Entity(object):
                 pretty_print=pretty
             )
 
-        s = six.text_type(sio.getvalue()).strip()
+        # Ensure that the StringIO buffer is unicode
+        s = six.text_type(sio.getvalue())
 
         if encoding:
             return s.encode(encoding)
@@ -482,7 +491,7 @@ class Entity(object):
         """Parse a JSON string and build an entity."""
         try:
             d = json.load(json_doc)
-        except AttributeError: # catch the read() error
+        except AttributeError:  # catch the read() error
             d = json.loads(json_doc)
 
         return cls.from_dict(d)
