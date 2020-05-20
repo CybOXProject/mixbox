@@ -227,10 +227,10 @@ class TestNamespaceSet(unittest.TestCase):
                                "[^"]*"           # value
                            """
 
-    XMLNS_RE_NO_CAP = re.compile(r"^\s*"     + ONE_XMLNS_RE_NO_CAP + """
-                                   (?:\s+""" + ONE_XMLNS_RE_NO_CAP + """
-                                 )*\s*$""",
-                                 re.X)
+    XMLNS_RE_NO_CAP = re.compile(
+        r"""^\s*%s(?:\s+%s)*\s*$""" % (ONE_XMLNS_RE_NO_CAP, ONE_XMLNS_RE_NO_CAP),
+        re.X
+    )
 
     # For pulling out the individual namespace declarations
     XMLNS_RE = re.compile(r"""
