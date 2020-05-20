@@ -3,7 +3,9 @@
 # Copyright (c) 2015 - The MITRE Corporation
 # For license information, see the LICENSE.txt file
 
+import sys
 from os.path import abspath, dirname, join
+
 from setuptools import setup, find_packages
 
 BASE_DIR = dirname(abspath(__file__))
@@ -22,7 +24,17 @@ def get_version():
 with open('README.rst') as f:
     readme = f.read()
 
-install_requires = ['lxml', 'python-dateutil', 'ordered-set']
+install_requires = ['python-dateutil', 'ordered-set']
+
+py_maj, py_minor = sys.version_info[:2]
+# lxml has dropped support for Python 2.6, 3.3 after version 4.2.6
+if (py_maj, py_minor) == (2, 6) or (py_maj, py_minor) == (3, 3):
+    install_requires.append('lxml>=2.2.3,<4.3.0')
+# lxml has dropped support for Python 2.6, 3.3, 3.4 after version 4.4.0
+elif (py_maj, py_minor) == (2, 6) or (py_maj, py_minor) == (3, 4):
+    install_requires.append('lxml>=2.2.3,<4.4.0')
+else:
+    install_requires.append('lxml')
 
 # Some required modules/packages don't exist in all versions of Python.
 # Luckily, backports exist in PyPI.
