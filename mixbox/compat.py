@@ -15,6 +15,8 @@ if six.PY2:
         key = int(key)
         return b''.join([chr(ord(c) ^ key) for c in data])
 
+    from collections import MutableSequence
+
 elif six.PY3:
     long = int
     def xor(data, key):
@@ -24,3 +26,4 @@ elif six.PY3:
             b[i] ^= key
         return bytes(b)
 
+    from collections.abc import MutableSequence

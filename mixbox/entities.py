@@ -2,13 +2,13 @@
 # See LICENSE.txt for complete terms.
 
 # stdlib
-import collections
 import json
 import warnings
 
 from . import namespaces
 from . import idgen, signals
 from .binding_utils import save_encoding
+from .compat import MutableSequence
 from .datautils import is_sequence
 from .vendor import six
 
@@ -518,7 +518,7 @@ class Entity(object):
         return cls.from_obj(entity_obj).to_dict()
 
 
-class EntityList(collections.MutableSequence, Entity):
+class EntityList(MutableSequence, Entity):
     """An EntityList is an Entity that behaves like a mutable sequence.
 
     EntityList implementations must define one multiple TypedField which

@@ -1,14 +1,14 @@
 # Copyright (c) 2015, The MITRE Corporation. All rights reserved.
 # See LICENSE.txt for complete terms.
-import collections
 import sys
 
+from .compat import MutableSequence
 from .datautils import is_sequence, resolve_class, needkwargs
 from .entities import EntityList
 from .vendor import six
 
 
-class TypedList(collections.MutableSequence):
+class TypedList(MutableSequence):
     """A type-aware mutable sequence that performs input validation when
     inserting new items.
 
