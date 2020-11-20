@@ -15,9 +15,12 @@ if six.PY2:
         key = int(key)
         return b''.join([chr(ord(c) ^ key) for c in data])
 
+    from collections import Mapping
     from collections import MutableMapping
     from collections import MutableSequence
+    from collections import MutableSet
     from collections import Sequence
+    from collections import Set
 
 elif six.PY3:
     long = int
@@ -28,6 +31,9 @@ elif six.PY3:
             b[i] ^= key
         return bytes(b)
 
+    from collections.abc import Mapping
     from collections.abc import MutableMapping
     from collections.abc import MutableSequence
+    from collections.abc import MutableSet
     from collections.abc import Sequence
+    from collections.abc import Set
