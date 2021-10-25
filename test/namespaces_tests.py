@@ -114,12 +114,12 @@ class TestNamespaceSet(unittest.TestCase):
         self.assertEqual(ns.preferred_prefix_for_namespace("a:b:c"), "abc")
 
         ns.set_preferred_prefix_for_namespace("a:b:c", "def")
-        self.assertEquals(ns.preferred_prefix_for_namespace("a:b:c"), "def")
+        self.assertEqual(ns.preferred_prefix_for_namespace("a:b:c"), "def")
 
         ns.set_preferred_prefix_for_namespace("a:b:c", None)
 
         ns.set_preferred_prefix_for_namespace("a:b:c", "ghi", True)
-        self.assertEquals(ns.preferred_prefix_for_namespace("a:b:c"), "ghi")
+        self.assertEqual(ns.preferred_prefix_for_namespace("a:b:c"), "ghi")
 
         ns.add_prefix("a:b:c", "jkl", True)
         self.assertEqual(ns.preferred_prefix_for_namespace("a:b:c"), "jkl")
