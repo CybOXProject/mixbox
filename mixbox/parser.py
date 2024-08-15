@@ -2,7 +2,11 @@
 # See LICENSE.txt for complete terms.
 
 from abc import ABCMeta, abstractmethod
-from distutils.version import StrictVersion
+
+try:
+    from packaging.version import Version
+except ImportError:
+    from distutils.version import StrictVersion as Version
 
 from .exceptions import ignored
 from .xml import get_etree_root, get_etree, get_schemaloc_pairs
@@ -59,7 +63,7 @@ class EntityParser(object):
             root (etree.Element)
 
         Returns:
-            distutils.StrictVersion
+            packaging.version.Version
 
         Raises:
             UnknownVersionError
@@ -69,7 +73,7 @@ class EntityParser(object):
         # "cybox_minor_version", and "cybox_update_version".
         version = self.get_version(root)
         if version:
-            return StrictVersion(version)
+            return Version(version)
 
         raise UnknownVersionError(
             "Unable to determine the version of the input document. No "
@@ -86,7 +90,7 @@ class EntityParser(object):
             UnsupportedVersionError
         """
         version = self._get_version(root)
-        supported = [StrictVersion(x) for x in
+        supported = [Version(x) for x in
                      self.supported_versions(root.tag)]
 
         if version in supported:
